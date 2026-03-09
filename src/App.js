@@ -2109,6 +2109,7 @@ function Pagos() {
   // States para filtros del historial de pagos
   const [pagoSearchTerm, setPagoSearchTerm] = useState('');
   const [filterFechaPrestamo, setFilterFechaPrestamo] = useState('');
+  const [filterFechaPago, setFilterFechaPago] = useState('');
 
   const [isViewPagoModalOpen, setIsViewPagoModalOpen] = useState(false);
   const [isEditPagoModalOpen, setIsEditPagoModalOpen] = useState(false);
@@ -2147,12 +2148,13 @@ function Pagos() {
 
   const filteredPrestamos = prestamosDb.filter(p => p.clienteNombre && p.clienteNombre.toLowerCase().includes(clienteSearch.toLowerCase()));
   
-  // Filtro compuesto por Nombre de Cliente Y Fecha de Préstamo
+  // Filtro compuesto por Nombre de Cliente Y Fecha de Préstamo Y Fecha de Pago
   const filteredPagosHistory = pagosDb
     .filter(p => {
       const matchClient = p.clienteNombre && p.clienteNombre.toLowerCase().includes(pagoSearchTerm.toLowerCase());
-      const matchDate = filterFechaPrestamo === '' || p.fechaPrestamo === filterFechaPrestamo;
-      return matchClient && matchDate;
+      const matchDatePres = filterFechaPrestamo === '' || p.fechaPrestamo === filterFechaPrestamo;
+      const matchDatePago = filterFechaPago === '' || p.fechaPago === filterFechaPago;
+      return matchClient && matchDatePres && matchDatePago;
     })
     .sort((a,b) => new Date(b.fechaPago) - new Date(a.fechaPago));
 
@@ -2228,7 +2230,7 @@ function Pagos() {
         concepto: form.concepto,
         comentario: form.comentario,
         interesCobrado: interesCobrado.toFixed(2), 
-        interesInversionistas: interesInversionistasCobrado.toFixed(2), // Guardamos la parte que le toca al inversor
+        interesInversionistas: interesInversionistasCobrado.toFixed(2), 
         voucher: pagoVoucher, 
         createdAt: serverTimestamp()
       });
@@ -2408,8 +2410,8 @@ function Pagos() {
           <h2 className="text-xl font-bold text-slate-700">Historial de Pagos Recientes</h2>
           
           {/* Opciones de Filtrado Compuesto */}
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto bg-slate-50 p-3 rounded-lg border border-slate-200">
-            <div className="relative w-full sm:w-64">
+          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="relative w-full md:w-56">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
               <input 
                 type="text" 
@@ -2419,22 +2421,34 @@ function Pagos() {
                 className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
               />
             </div>
-            <div className="flex w-full sm:w-auto gap-2">
-              <div className="relative flex-1">
+            <div className="flex w-full md:w-auto gap-2">
+              <div className="relative flex-1 md:w-40">
+                <label className="text-[10px] text-slate-500 absolute -top-2 left-2 bg-slate-50 px-1 font-bold">F. Préstamo</label>
                 <input 
                   type="date" 
                   value={filterFechaPrestamo}
                   onChange={(e) => setFilterFechaPrestamo(e.target.value)}
-                  title="Filtrar por fecha en que se dio el Préstamo"
                   className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
                 />
               </div>
               {filterFechaPrestamo && (
-                <button 
-                  onClick={() => setFilterFechaPrestamo('')}
-                  className="bg-white border border-slate-300 text-slate-500 hover:text-rose-500 px-3 py-2 rounded shadow-sm text-xs font-bold transition-colors"
-                  title="Limpiar fecha"
-                >
+                <button onClick={() => setFilterFechaPrestamo('')} className="bg-white border border-slate-300 text-slate-500 hover:text-rose-500 px-2 rounded shadow-sm flex items-center justify-center transition-colors">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <div className="flex w-full md:w-auto gap-2">
+              <div className="relative flex-1 md:w-40">
+                <label className="text-[10px] text-slate-500 absolute -top-2 left-2 bg-slate-50 px-1 font-bold">F. Pago</label>
+                <input 
+                  type="date" 
+                  value={filterFechaPago}
+                  onChange={(e) => setFilterFechaPago(e.target.value)}
+                  className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
+                />
+              </div>
+              {filterFechaPago && (
+                <button onClick={() => setFilterFechaPago('')} className="bg-white border border-slate-300 text-slate-500 hover:text-rose-500 px-2 rounded shadow-sm flex items-center justify-center transition-colors">
                   <X size={14} />
                 </button>
               )}
