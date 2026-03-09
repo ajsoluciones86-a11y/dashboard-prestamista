@@ -653,7 +653,11 @@ function ListadoClientes() {
                                   {estado}
                                 </span>
                               </div>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-4">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-y-5 gap-x-4">
+                                <div>
+                                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-semibold">Fecha Inicio</p>
+                                  <p className="text-sm font-semibold text-slate-700">{loan.fecha || '-'}</p>
+                                </div>
                                 <div>
                                   <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-semibold">Monto Orig.</p>
                                   <p className="text-sm font-semibold text-slate-700">S/ {loan.monto}</p>
