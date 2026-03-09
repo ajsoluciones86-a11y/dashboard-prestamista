@@ -83,9 +83,9 @@ const getEstadoPrestamo = (prestamo) => {
   const diffTime = fechaVencimiento.getTime() - hoy.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return 'Vencido'; // Ya pasó el día de pago
-  if (diffDays <= 3) return 'Por vencer'; // Faltan 3 días o es hoy (diffDays === 0)
-  return 'Al día'; // Faltan más de 3 días
+  if (diffDays < 0) return 'Vencido'; 
+  if (diffDays <= 3) return 'Por vencer'; 
+  return 'Al día'; 
 };
 
 const UserContext = createContext(null);
@@ -133,7 +133,7 @@ export default function App() {
 
   const navigateTo = (view) => {
     setCurrentView(view);
-    setIsMobileMenuOpen(false); // Cierra el menú al seleccionar una opción en móvil
+    setIsMobileMenuOpen(false); 
   };
 
   return (
@@ -1297,6 +1297,24 @@ function ListadoPrestamos() {
                     {getEstadoPrestamo(selectedLoanView)}
                   </span>
                 </div>
+
+                {/* Mostrar Inversionistas si existen */}
+                {selectedLoanView.financingSources?.includes('inversionista') && selectedLoanView.selectedInvestors?.length > 0 && (
+                  <div className="col-span-2 md:col-span-4 mt-2 bg-blue-50/80 p-3.5 rounded-lg border border-blue-200">
+                    <p className="text-[10px] text-blue-800 mb-2 uppercase tracking-wider font-bold flex items-center gap-1"><Users size={12}/> Inversionistas Vinculados</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedLoanView.selectedInvestors.map(invId => {
+                        const inv = investorsDb.find(i => i.id === invId);
+                        const amt = selectedLoanView.investorAmounts?.[invId] || 0;
+                        return (
+                          <span key={invId} className="bg-white border border-blue-300 text-blue-900 text-xs px-2.5 py-1 rounded shadow-sm font-semibold">
+                            {inv ? inv.nombre : 'Desconocido'} (S/ {amt})
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Cálculos de Rentabilidad */}
@@ -1511,7 +1529,6 @@ function ListadoInversionistas() {
         createdAt: serverTimestamp()
       });
 
-      // Si es devolución, actualizar el monto del capital del inversionista
       if (pagoForm.concepto === 'Devolución') {
         const nuevoMonto = Math.max(0, parseFloat(inv.monto || 0) - parseFloat(pagoForm.monto));
         const invRef = getDocRef(user, 'inversionistas', inv.id);
@@ -1946,7 +1963,10 @@ function Pagos() {
   const [pagosDb, setPagosDb] = useState([]);
   const [investorsDb, setInvestorsDb] = useState([]);
   
+  // States para filtros del historial de pagos
   const [pagoSearchTerm, setPagoSearchTerm] = useState('');
+  const [filterFechaPrestamo, setFilterFechaPrestamo] = useState('');
+
   const [isViewPagoModalOpen, setIsViewPagoModalOpen] = useState(false);
   const [isEditPagoModalOpen, setIsEditPagoModalOpen] = useState(false);
   const [selectedPagoModal, setSelectedPagoModal] = useState(null);
@@ -1983,7 +2003,15 @@ function Pagos() {
   };
 
   const filteredPrestamos = prestamosDb.filter(p => p.clienteNombre && p.clienteNombre.toLowerCase().includes(clienteSearch.toLowerCase()));
-  const filteredPagosHistory = pagosDb.filter(p => p.clienteNombre && p.clienteNombre.toLowerCase().includes(pagoSearchTerm.toLowerCase())).sort((a,b) => new Date(b.fechaPago) - new Date(a.fechaPago));
+  
+  // Filtro compuesto por Nombre de Cliente Y Fecha de Préstamo
+  const filteredPagosHistory = pagosDb
+    .filter(p => {
+      const matchClient = p.clienteNombre && p.clienteNombre.toLowerCase().includes(pagoSearchTerm.toLowerCase());
+      const matchDate = filterFechaPrestamo === '' || p.fechaPrestamo === filterFechaPrestamo;
+      return matchClient && matchDate;
+    })
+    .sort((a,b) => new Date(b.fechaPago) - new Date(a.fechaPago));
 
   const handleRegistrarPago = async () => {
     if(!selectedPrestamo || !form.montoPagado || !form.fechaPago) return alert("Seleccione un préstamo de la lista, digite la fecha y el monto a pagar.");
@@ -2223,7 +2251,7 @@ function Pagos() {
             </div>
             
             <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
-              <button onClick={handleRegistrarPago} disabled={isSaving} className={`w-full sm:w-auto px-8 py-3 rounded-lg shadow-md font-bold transition-all flex items-center justify-center gap-2 ${!selectedPrestamo ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-[#2d70c4] hover:bg-[#255ba1] hover:shadow-lg text-white'}`}>
+              <button onClick={handleRegistrarPago} disabled={isSaving || !selectedPrestamo} className={`w-full sm:w-auto px-8 py-3 rounded-lg shadow-md font-bold transition-all flex items-center justify-center gap-2 ${!selectedPrestamo ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-[#2d70c4] hover:bg-[#255ba1] hover:shadow-lg text-white'}`}>
                 {isSaving ? <RefreshCcw size={18} className="animate-spin" /> : 'Procesar Pago'}
               </button>
             </div>
@@ -2233,17 +2261,41 @@ function Pagos() {
 
       {/* SECCIÓN: HISTORIAL DE PAGOS */}
       <div className="w-full border-t border-slate-200 pt-8">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-end mb-6 gap-4">
           <h2 className="text-xl font-bold text-slate-700">Historial de Pagos Recientes</h2>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              value={pagoSearchTerm}
-              onChange={(e) => setPagoSearchTerm(e.target.value)}
-              placeholder="Buscar recibo por cliente..." 
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-400 shadow-sm text-slate-700 bg-white"
-            />
+          
+          {/* Opciones de Filtrado Compuesto */}
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+              <input 
+                type="text" 
+                value={pagoSearchTerm}
+                onChange={(e) => setPagoSearchTerm(e.target.value)}
+                placeholder="Buscar por cliente..." 
+                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
+              />
+            </div>
+            <div className="flex w-full sm:w-auto gap-2">
+              <div className="relative flex-1">
+                <input 
+                  type="date" 
+                  value={filterFechaPrestamo}
+                  onChange={(e) => setFilterFechaPrestamo(e.target.value)}
+                  title="Filtrar por fecha en que se dio el Préstamo"
+                  className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
+                />
+              </div>
+              {filterFechaPrestamo && (
+                <button 
+                  onClick={() => setFilterFechaPrestamo('')}
+                  className="bg-white border border-slate-300 text-slate-500 hover:text-rose-500 px-3 py-2 rounded shadow-sm text-xs font-bold transition-colors"
+                  title="Limpiar fecha"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2254,7 +2306,8 @@ function Pagos() {
                 <tr className="bg-[#f0f3f7] text-slate-600 font-semibold border-b border-slate-200 text-xs uppercase tracking-wider">
                   <th className="py-3 px-4 sm:px-6 w-24">Recibo ID</th>
                   <th className="py-3 px-4 sm:px-6">Cliente</th>
-                  <th className="py-3 px-4 sm:px-6">Fecha</th>
+                  <th className="py-3 px-4 sm:px-6">F. Préstamo</th>
+                  <th className="py-3 px-4 sm:px-6">F. Pago</th>
                   <th className="py-3 px-4 sm:px-6">Concepto</th>
                   <th className="py-3 px-4 sm:px-6">Monto</th>
                   <th className="py-3 px-4 sm:px-6 text-right">Acciones</th>
@@ -2264,11 +2317,12 @@ function Pagos() {
                 {filteredPagosHistory.length > 0 ? (
                   filteredPagosHistory.map((pago) => (
                     <tr key={pago.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 sm:px-6 text-slate-400 font-mono text-xs">{pago.id.slice(0, 6)}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-400 font-mono text-[10px]">{pago.id.slice(0, 6)}</td>
                       <td className="py-3.5 px-4 sm:px-6 text-slate-800 font-bold">{pago.clienteNombre}</td>
-                      <td className="py-3.5 px-4 sm:px-6 text-slate-600">{pago.fechaPago || '-'}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-500 text-xs">{pago.fechaPrestamo || '-'}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-700 font-medium">{pago.fechaPago || '-'}</td>
                       <td className="py-3.5 px-4 sm:px-6 text-slate-600">
-                        <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 text-[11px] font-semibold text-slate-600">{pago.concepto}</span>
+                        <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 text-[10px] font-semibold text-slate-600">{pago.concepto}</span>
                       </td>
                       <td className="py-3.5 px-4 sm:px-6 text-emerald-700 font-black">S/ {pago.montoPagado}</td>
                       <td className="py-3.5 px-4 sm:px-6 text-right">
@@ -2285,10 +2339,10 @@ function Pagos() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="py-12 text-center text-slate-500">
+                    <td colSpan="7" className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <CreditCard size={32} className="opacity-20" />
-                        <p>No se encontraron pagos registrados.</p>
+                        <p>No se encontraron pagos registrados con esos filtros.</p>
                       </div>
                     </td>
                   </tr>
