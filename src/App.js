@@ -457,6 +457,7 @@ function ListadoClientes() {
         </div>
       </div>
 
+      {/* Modal Nuevo/Editar Cliente */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
@@ -503,6 +504,7 @@ function ListadoClientes() {
         </div>
       )}
 
+      {/* Modal Ver Detalles */}
       {isViewModalOpen && selectedClient && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -1403,7 +1405,7 @@ function ListadoInversionistas() {
               <div>
                  <label className="block text-sm font-bold mb-1">Concepto</label>
                  <select value={pagoForm.concepto} onChange={e=>setPagoForm({...pagoForm, concepto: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white">
-                   <option value="Interés">Pago de Interés (Ganancia)</option><option value="Devolución">Devolución de Capital</option>
+                   <option value="Interés">Pago de Interés (Ganancia)</option><option value="Devolución">Devolución de Capital (Resta)</option>
                  </select>
               </div>
               <div>
@@ -1513,6 +1515,10 @@ function Pagos() {
   const [isEditPagoModalOpen, setIsEditPagoModalOpen] = useState(false);
   const [selectedPagoModal, setSelectedPagoModal] = useState(null);
 
+  const [editPagoForm, setEditPagoForm] = useState({
+    id: '', clienteNombre: '', fechaPrestamo: '', fechaPago: '', montoPagado: '', banco: '', concepto: '', comentario: ''
+  });
+
   useEffect(() => {
     const presRef = getCollectionRef(user, 'prestamos');
     const pagRef = getCollectionRef(user, 'pagos');
@@ -1617,137 +1623,415 @@ function Pagos() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-10">
-      <div className="w-full max-w-2xl bg-white border p-6 rounded-lg shadow-sm">
-        <h1 className="text-xl font-bold mb-4">Registrar Pago a Préstamo</h1>
-        <div className="mb-4 relative">
-          <label className="text-xs font-bold">Buscar Cliente Deudor</label>
-          <input type="text" value={clienteSearch} onChange={e=>{setClienteSearch(e.target.value); setSelectedPrestamo(null);}} onFocus={()=>setShowDropdown(true)} onBlur={()=>setTimeout(()=>setShowDropdown(false), 200)} placeholder="Escribir nombre..." className="w-full border p-2 rounded"/>
-          {showDropdown && filteredPrestamos.length > 0 && (
-            <ul className="absolute z-10 bg-white border w-full max-h-48 overflow-y-auto shadow-lg">
-              {filteredPrestamos.filter(p=>parseFloat(p.saldo !== undefined ? p.saldo : p.monto)>0).map(c=>(
-                <li key={c.id} onMouseDown={()=>{setClienteSearch(c.clienteNombre); setSelectedPrestamo(c); setShowDropdown(false)}} className="p-2 hover:bg-blue-50 cursor-pointer border-b flex justify-between text-sm">
-                  <b>{c.clienteNombre}</b> <span>Saldo: S/{c.saldo !== undefined ? c.saldo : c.monto}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        {selectedPrestamo && (
-          <div className="bg-blue-50 p-4 rounded mb-4 text-sm flex justify-between border border-blue-200">
-             <span><b>Deuda Original:</b> S/{selectedPrestamo.monto}</span>
-             <span className="text-rose-600 font-bold"><b>Saldo Pendiente:</b> S/{selectedPrestamo.saldo !== undefined ? selectedPrestamo.saldo : selectedPrestamo.monto}</span>
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div><label className="text-xs font-bold">Fecha de Pago</label><input type="date" value={form.fechaPago} onChange={e=>setForm({...form,fechaPago:e.target.value})} className="w-full border p-2 rounded"/></div>
-          <div><label className="text-xs font-bold">Monto Recibido</label><input type="number" value={form.montoPagado} onChange={e=>setForm({...form,montoPagado:e.target.value})} className="w-full border p-2 rounded font-bold"/></div>
-          <div><label className="text-xs font-bold">Concepto</label>
-            <select value={form.concepto} onChange={e=>setForm({...form,concepto:e.target.value})} className="w-full border p-2 rounded bg-white"><option>Interés</option><option>Amortización</option><option>Ambos (Interés + Amortización)</option></select>
-          </div>
-          <div><label className="text-xs font-bold">Método</label>
-            <select value={form.banco} onChange={e=>setForm({...form,banco:e.target.value})} className="w-full border p-2 rounded bg-white"><option>Efectivo</option><option>BCP</option><option>Interbank</option><option>Yape / Plin</option></select>
-          </div>
-          {form.banco !== 'Efectivo' && (
-            <div className="col-span-2 flex items-center gap-2 mt-2">
-               <div className="relative border border-dashed p-2 rounded w-full text-center text-sm bg-slate-50 cursor-pointer">
-                 {pagoVoucher ? pagoVoucher.name : 'Adjuntar Voucher'} <input type="file" onChange={handleVoucherUpload} className="absolute left-0 top-0 opacity-0 w-full h-full cursor-pointer"/>
-               </div>
-               {pagoVoucher && <button onClick={(e)=>{e.preventDefault(); openPreview(pagoVoucher.name, pagoVoucher.data)}} className="p-2 border rounded bg-white"><Eye size={16}/></button>}
-            </div>
-          )}
-        </div>
-        <button onClick={handleRegistrarPago} disabled={!selectedPrestamo || isSaving} className="w-full bg-[#3173c6] text-white font-bold p-3 rounded hover:bg-[#2860a8] disabled:bg-slate-300">
-          {isSaving ? 'Procesando...' : 'Procesar Ingreso'}
-        </button>
-      </div>
-
-      <div className="w-full max-w-5xl">
-        <h2 className="text-xl font-bold mb-4">Historial de Pagos de Clientes</h2>
-        <div className="flex flex-col md:flex-row gap-4 mb-4 p-4 bg-slate-50 border rounded-lg">
-           <div className="flex-1"><label className="text-[10px] font-bold block mb-1">Buscar Cliente</label><input type="text" placeholder="Escribir..." value={pagoSearchTerm} onChange={e=>setPagoSearchTerm(e.target.value)} className="border p-2 rounded w-full text-sm outline-none"/></div>
-           <div><label className="text-[10px] font-bold block mb-1">Filtro: F. Préstamo</label><div className="flex gap-1"><input type="date" value={filterFechaPrestamo} onChange={e=>setFilterFechaPrestamo(e.target.value)} className="border p-2 rounded text-sm"/>{filterFechaPrestamo&&<button onClick={()=>setFilterFechaPrestamo('')} className="bg-white border px-2 rounded"><X size={14}/></button>}</div></div>
-           <div><label className="text-[10px] font-bold block mb-1">Filtro: F. Pago Realizado</label><div className="flex gap-1"><input type="date" value={filterFechaPago} onChange={e=>setFilterFechaPago(e.target.value)} className="border p-2 rounded text-sm"/>{filterFechaPago&&<button onClick={()=>setFilterFechaPago('')} className="bg-white border px-2 rounded"><X size={14}/></button>}</div></div>
-        </div>
-        <div className="bg-white border rounded-lg overflow-x-auto shadow-sm">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50 border-b"><tr><th className="p-3">Cliente</th><th className="p-3">F. Préstamo</th><th className="p-3">F. Pago</th><th className="p-3">Concepto</th><th className="p-3">Monto Total</th><th className="p-3">Ganancia Empresa</th><th className="p-3 text-right">Acciones</th></tr></thead>
-            <tbody>
-              {filteredPagosHistory.length > 0 ? filteredPagosHistory.map(p => (
-                <tr key={p.id} className="border-b hover:bg-slate-50">
-                  <td className="p-3 font-bold text-slate-800">{p.clienteNombre}</td>
-                  <td className="p-3 text-slate-500">{p.fechaPrestamo}</td>
-                  <td className="p-3 font-medium">{p.fechaPago}</td>
-                  <td className="p-3 text-xs"><span className="border px-2 py-1 rounded bg-slate-100">{p.concepto}</span></td>
-                  <td className="p-3 font-black text-emerald-700">S/ {p.montoPagado}</td>
-                  <td className="p-3 font-bold text-[#3173c6]">S/ {Math.max(0, parseFloat(p.concepto==='Interés'?p.montoPagado:p.interesCobrado||0) - parseFloat(p.interesInversionistas||0)).toFixed(2)}</td>
-                  <td className="p-3 text-right">
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => openEditPago(p)} className="bg-white border text-xs px-3 py-1.5 rounded hover:bg-slate-100">Editar</button>
-                      <button onClick={() => { setSelectedPagoModal(p); setIsViewPagoModalOpen(true); }} className="bg-slate-800 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-700">Ver</button>
-                    </div>
-                  </td>
-                </tr>
-              )) : <tr><td colSpan="7" className="p-6 text-center text-slate-500">No se encontraron pagos con estos filtros.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {isEditPagoModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
-           <div className="bg-white p-6 rounded-xl shadow-2xl w-96">
-              <h2 className="font-bold mb-4">Editar Pago</h2>
-              <input type="date" value={editPagoForm.fechaPago} onChange={e=>setEditPagoForm({...editPagoForm, fechaPago: e.target.value})} className="w-full border p-2 mb-3 rounded" />
-              <input type="number" value={editPagoForm.montoPagado} onChange={e=>setEditPagoForm({...editPagoForm, montoPagado: e.target.value})} className="w-full border p-2 mb-3 rounded font-bold" />
-              <select value={editPagoForm.concepto} onChange={e=>setEditPagoForm({...editPagoForm, concepto: e.target.value})} className="w-full border p-2 mb-4 rounded"><option value="Interés">Interés</option><option value="Amortización">Amortización</option><option value="Ambos (Interés + Amortización)">Ambos</option></select>
-              <div className="flex justify-end gap-2"><button onClick={()=>setIsEditPagoModalOpen(false)}>Cancelar</button><button onClick={handleGuardarEditPago} className="bg-blue-600 text-white px-4 py-2 rounded">Guardar</button></div>
-           </div>
-        </div>
-      )}
-
-      {isViewPagoModalOpen && selectedPagoModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
-             <h2 className="font-bold text-lg mb-4 border-b pb-2">Recibo de Pago</h2>
-             <div className="text-center mb-6"><p className="text-4xl font-black text-emerald-600">S/ {selectedPagoModal.montoPagado}</p><p className="text-sm font-bold text-slate-500 mt-1">{selectedPagoModal.fechaPago}</p></div>
-             
-             {selectedPagoModal.concepto === 'Ambos (Interés + Amortización)' && (
-                 <div className="flex justify-center gap-4 mb-4 border-t pt-4">
-                     <div className="text-center"><p className="text-[10px] uppercase font-bold text-slate-500">Interés</p><p className="font-bold">S/ {selectedPagoModal.interesCobrado}</p></div>
-                     <div className="text-center"><p className="text-[10px] uppercase font-bold text-slate-500">Amortización</p><p className="font-bold">S/ {(parseFloat(selectedPagoModal.montoPagado)-parseFloat(selectedPagoModal.interesCobrado)).toFixed(2)}</p></div>
-                 </div>
-             )}
-
-             <div className="grid grid-cols-2 gap-4 text-sm mb-6 border-t pt-4">
-                <div><b>Cliente:</b><br/>{selectedPagoModal.clienteNombre}</div>
-                <div><b>Concepto:</b><br/>{selectedPagoModal.concepto}</div>
-                <div><b>Banco:</b><br/>{selectedPagoModal.banco}</div>
-                <div><b>F. Préstamo Base:</b><br/>{selectedPagoModal.fechaPrestamo}</div>
-             </div>
-
-             {parseFloat(selectedPagoModal.interesInversionistas || 0) > 0 && (
-                <div className="bg-emerald-50 p-3 rounded mb-4 text-sm border border-emerald-100">
-                    <p className="flex justify-between mb-1"><span>Ganancia Bruta:</span> <b>S/ {selectedPagoModal.concepto === 'Interés' ? selectedPagoModal.montoPagado : selectedPagoModal.interesCobrado}</b></p>
-                    <p className="flex justify-between text-rose-600 mb-1"><span>A Inversores:</span> <b>- S/ {selectedPagoModal.interesInversionistas}</b></p>
-                    <p className="flex justify-between font-black text-emerald-800 border-t border-emerald-200 pt-1 mt-1"><span>Ganancia Real:</span> <span>S/ {(parseFloat(selectedPagoModal.concepto === 'Interés' ? selectedPagoModal.montoPagado : selectedPagoModal.interesCobrado) - parseFloat(selectedPagoModal.interesInversionistas)).toFixed(2)}</span></p>
+    <div className="w-full flex flex-col gap-10 lg:max-w-4xl">
+      {/* SECCIÓN: FORMULARIO DE REGISTRO */}
+      <div className="w-full lg:max-w-3xl">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-700 mb-6">Registrar Pago</h1>
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-visible">
+          <div className="p-5 border-b border-slate-200 bg-slate-50 rounded-t-xl relative z-20">
+            <h2 className="text-sm font-bold text-[#3173c6] mb-4 flex items-center gap-2"><Search size={16} /> Buscar Préstamo Activo</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Cliente / Préstamo</label>
+                <div className="relative">
+                  <input type="text" value={clienteSearch} onChange={e => { setClienteSearch(e.target.value); setSelectedPrestamo(null); }} onFocus={() => setShowDropdown(true)} onBlur={() => setTimeout(() => setShowDropdown(false), 200)} placeholder="Escribe el nombre del cliente para buscar..." className="w-full border border-slate-300 rounded-lg p-3 text-sm bg-white focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] focus:outline-none transition-all shadow-sm" />
+                  {showDropdown && filteredPrestamos.length > 0 && (
+                    <ul className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl max-h-56 overflow-auto top-full left-0">
+                      {filteredPrestamos.filter(p => parseFloat(p.saldo !== undefined ? p.saldo : p.monto) > 0).map((c) => (
+                        <li key={c.id} onMouseDown={(e) => { 
+                          e.preventDefault(); 
+                          setClienteSearch(c.clienteNombre); 
+                          setSelectedPrestamo(c); 
+                          setShowDropdown(false); 
+                        }} className="p-3 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1 transition-colors">
+                          <span className="font-semibold text-slate-800">{c.clienteNombre}</span> 
+                          <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 border border-slate-200">Saldo: S/ {c.saldo !== undefined ? c.saldo : c.monto} <span className="opacity-50 mx-1">|</span> Vence: {c.proximaFechaPago || getFechaUnMesDespues(c.fecha)}</span>
+                        </li>
+                      ))}
+                      {filteredPrestamos.filter(p => parseFloat(p.saldo !== undefined ? p.saldo : p.monto) > 0).length === 0 && (
+                         <li className="p-4 text-sm text-center text-slate-500">Este cliente no tiene deudas pendientes.</li>
+                      )}
+                    </ul>
+                  )}
                 </div>
-             )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-5 sm:p-6 space-y-5">
+            {/* Panel de Ayuda del Préstamo Seleccionado */}
+            {selectedPrestamo && (
+              <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100 shadow-inner mb-2 animate-in fade-in zoom-in-95 duration-300">
+                 <div className="bg-white p-3 rounded-lg border border-blue-100/50 shadow-sm">
+                   <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">Deuda Pendiente</label>
+                   <div className="text-lg font-bold text-[#3173c6]">S/ {selectedPrestamo.saldo !== undefined ? selectedPrestamo.saldo : selectedPrestamo.monto}</div>
+                 </div>
+                 <div className="bg-white p-3 rounded-lg border border-blue-100/50 shadow-sm">
+                   <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">Interés Generado ({selectedPrestamo.tasa}%)</label>
+                   <div className="text-lg font-bold text-amber-600">S/ {((parseFloat(selectedPrestamo.saldo !== undefined ? selectedPrestamo.saldo : selectedPrestamo.monto) || 0) * (parseFloat(selectedPrestamo.tasa || 0) / 100)).toFixed(2)}</div>
+                 </div>
+              </div>
+            )}
 
-             {selectedPagoModal.voucher && <button onClick={()=>openPreview(selectedPagoModal.voucher.name, selectedPagoModal.voucher.data)} className="w-full bg-blue-50 text-blue-600 p-2 rounded font-bold flex items-center justify-center gap-2 mb-4"><Eye size={16}/> Ver Voucher</button>}
-             <button onClick={()=>setIsViewPagoModalOpen(false)} className="w-full bg-slate-800 text-white p-2 rounded">Cerrar</button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Fecha del Pago</label>
+                <input type="date" value={form.fechaPago} onChange={e=>setForm({...form, fechaPago: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] text-slate-800 bg-slate-50 focus:bg-white transition-all" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Monto Entregado (S/)</label>
+                <input type="number" value={form.montoPagado} onChange={e=>setForm({...form, montoPagado: e.target.value})} placeholder="Ej. 150.00" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] text-slate-800 bg-slate-50 focus:bg-white transition-all" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Concepto</label>
+                <div className="relative">
+                  <select value={form.concepto} onChange={e=>setForm({...form, concepto: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white appearance-none text-slate-800 font-medium transition-all">
+                    <option value="Interés">Solo Interés</option>
+                    <option value="Amortización">Amortización (Abono a capital)</option>
+                    <option value="Ambos (Interés + Amortización)">Ambos (Interés + Abono)</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Método de Pago</label>
+                <div className="relative">
+                  <select value={form.banco} onChange={e=>setForm({...form, banco: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white appearance-none text-slate-800 transition-all">
+                    <option value="">Seleccionar método...</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="BCP">BCP</option>
+                    <option value="Interbank">Interbank</option>
+                    <option value="BBVA">BBVA</option>
+                    <option value="Yape / Plin">Yape / Plin</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                </div>
+
+                {form.banco && form.banco !== 'Efectivo' && form.banco !== '' && (
+                  <div className="mt-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <div className="relative overflow-hidden inline-block flex-1">
+                      <button className="w-full text-xs bg-white border border-slate-300 hover:border-[#3173c6] hover:text-[#3173c6] px-3 py-2 rounded-md text-slate-600 font-medium flex items-center justify-center gap-1.5 cursor-pointer truncate transition-colors">
+                        <Upload size={14} className="flex-shrink-0" /> 
+                        <span className="truncate">{pagoVoucher ? pagoVoucher.name : 'Adjuntar Voucher'}</span>
+                      </button>
+                      <input type="file" onChange={handleVoucherUpload} className="absolute left-0 top-0 opacity-0 cursor-pointer w-full h-full" />
+                    </div>
+                    {pagoVoucher && (
+                      <button onClick={(e) => { e.preventDefault(); openPreview(pagoVoucher.name, pagoVoucher.data); }} className="text-[#3173c6] bg-white hover:bg-blue-50 p-2 rounded-md border border-slate-300 shadow-sm transition-colors flex-shrink-0" title="Ver voucher">
+                        <Eye size={16} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col pt-2 gap-2">
+               <label className="text-sm font-medium text-slate-700">Comentarios (Opcional):</label>
+               <textarea rows="2" value={form.comentario} onChange={(e) => setForm({...form, comentario: e.target.value})} className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:border-[#3173c6] resize-none bg-slate-50 focus:bg-white"></textarea>
+            </div>
+            
+            <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
+              <button onClick={handleRegistrarPago} disabled={isSaving || !selectedPrestamo} className={`w-full sm:w-auto px-8 py-3 rounded-lg shadow-md font-bold transition-all flex items-center justify-center gap-2 ${!selectedPrestamo ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-[#2d70c4] hover:bg-[#255ba1] hover:shadow-lg text-white'}`}>
+                {isSaving ? <RefreshCcw size={18} className="animate-spin" /> : 'Procesar Pago'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECCIÓN: HISTORIAL DE PAGOS */}
+      <div className="w-full border-t border-slate-200 pt-8">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-end mb-6 gap-4">
+          <h2 className="text-xl font-bold text-slate-700">Historial de Pagos Recientes</h2>
+          
+          {/* Opciones de Filtrado Compuesto */}
+          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="relative w-full md:w-56">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+              <input 
+                type="text" 
+                value={pagoSearchTerm}
+                onChange={(e) => setPagoSearchTerm(e.target.value)}
+                placeholder="Buscar por cliente..." 
+                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
+              />
+            </div>
+            <div className="flex w-full md:w-auto gap-2">
+              <div className="relative flex-1 md:w-40">
+                <label className="text-[10px] text-slate-500 absolute -top-2 left-2 bg-slate-50 px-1 font-bold">F. Préstamo</label>
+                <input 
+                  type="date" 
+                  value={filterFechaPrestamo}
+                  onChange={(e) => setFilterFechaPrestamo(e.target.value)}
+                  className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
+                />
+              </div>
+              {filterFechaPrestamo && (
+                <button onClick={() => setFilterFechaPrestamo('')} className="bg-white border border-slate-300 text-slate-500 hover:text-rose-500 px-2 rounded shadow-sm flex items-center justify-center transition-colors">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <div className="flex w-full md:w-auto gap-2">
+              <div className="relative flex-1 md:w-40">
+                <label className="text-[10px] text-slate-500 absolute -top-2 left-2 bg-slate-50 px-1 font-bold">F. Pago</label>
+                <input 
+                  type="date" 
+                  value={filterFechaPago}
+                  onChange={(e) => setFilterFechaPago(e.target.value)}
+                  className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-[#3173c6] shadow-sm text-slate-700 bg-white"
+                />
+              </div>
+              {filterFechaPago && (
+                <button onClick={() => setFilterFechaPago('')} className="bg-white border border-slate-300 text-slate-500 hover:text-rose-500 px-2 rounded shadow-sm flex items-center justify-center transition-colors">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+              <thead>
+                <tr className="bg-[#f0f3f7] text-slate-600 font-semibold border-b border-slate-200 text-xs uppercase tracking-wider">
+                  <th className="py-3 px-4 sm:px-6 w-24">Recibo ID</th>
+                  <th className="py-3 px-4 sm:px-6">Cliente</th>
+                  <th className="py-3 px-4 sm:px-6">F. Préstamo</th>
+                  <th className="py-3 px-4 sm:px-6">F. Pago</th>
+                  <th className="py-3 px-4 sm:px-6">Concepto</th>
+                  <th className="py-3 px-4 sm:px-6">Monto</th>
+                  <th className="py-3 px-4 sm:px-6 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPagosHistory.length > 0 ? (
+                  filteredPagosHistory.map((pago) => (
+                    <tr key={pago.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-400 font-mono text-[10px]">{pago.id.slice(0, 6)}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-800 font-bold">{pago.clienteNombre}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-500 text-xs">{pago.fechaPrestamo || '-'}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-700 font-medium">{pago.fechaPago || '-'}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-600">
+                        <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 text-[10px] font-semibold text-slate-600">{pago.concepto}</span>
+                      </td>
+                      <td className="py-3.5 px-4 sm:px-6 text-emerald-700 font-black">S/ {pago.montoPagado}</td>
+                      <td className="py-3.5 px-4 sm:px-6 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => openEditPago(pago)} className="bg-white border border-slate-300 text-slate-600 text-xs px-3 py-1.5 rounded hover:bg-slate-100 transition-colors">
+                            Editar
+                          </button>
+                          <button onClick={() => { setSelectedPagoModal(pago); setIsViewPagoModalOpen(true); }} className="bg-slate-800 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-700 shadow-sm transition-colors">
+                            Detalles
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <CreditCard size={32} className="opacity-20" />
+                        <p>No se encontraron pagos registrados con esos filtros.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Editar Pago Clientes - FORMULARIO DETALLADO RESTAURADO */}
+      {isEditPagoModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800">Modificar Recibo de Pago</h2>
+              <button onClick={() => setIsEditPagoModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
+            </div>
+            <div className="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cliente a modificar</label>
+                  <input type="text" readOnly value={editPagoForm.clienteNombre} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-not-allowed" />
+               </div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Fecha Registrada</label>
+                  <input type="date" value={editPagoForm.fechaPago} onChange={e=>setEditPagoForm({...editPagoForm, fechaPago: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6]" />
+                 </div>
+                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Monto Pagado (S/)</label>
+                  <input type="number" value={editPagoForm.montoPagado} onChange={e=>setEditPagoForm({...editPagoForm, montoPagado: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6]" />
+                 </div>
+               </div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Método Guardado</label>
+                    <div className="relative">
+                      <select value={editPagoForm.banco} onChange={e=>setEditPagoForm({...editPagoForm, banco: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm appearance-none focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-white">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="BCP">BCP</option>
+                        <option value="Interbank">Interbank</option>
+                        <option value="BBVA">BBVA</option>
+                        <option value="Yape / Plin">Yape / Plin</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                    </div>
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Concepto Aplicado</label>
+                    <div className="relative">
+                      <select value={editPagoForm.concepto} onChange={e=>setEditPagoForm({...editPagoForm, concepto: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm appearance-none focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-white">
+                        <option value="Interés">Interés</option>
+                        <option value="Amortización">Amortización</option>
+                        <option value="Ambos (Interés + Amortización)">Ambos</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                    </div>
+                 </div>
+               </div>
+               <div className="flex flex-col pt-2 gap-2">
+                 <label className="text-sm font-medium text-slate-700">Comentarios:</label>
+                 <textarea rows="2" value={editPagoForm.comentario || ''} onChange={(e) => setEditPagoForm({...editPagoForm, comentario: e.target.value})} className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:border-[#3173c6] resize-none bg-white"></textarea>
+               </div>
+               <p className="text-xs text-rose-500 bg-rose-50 p-2 rounded border border-rose-100 mt-2">
+                 <b>Nota:</b> Modificar un pago antiguo desde aquí no recalculará el saldo de la deuda automáticamente. Hazlo con cuidado.
+               </p>
+            </div>
+            <div className="p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-white sm:bg-slate-50">
+              <button onClick={() => setIsEditPagoModalOpen(false)} className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 border border-slate-200 sm:border-transparent rounded-lg transition-colors">Cancelar</button>
+              <button onClick={handleGuardarEditPago} disabled={isSaving} className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors">
+                {isSaving ? <RefreshCcw size={16} className="animate-spin" /> : 'Guardar Cambios'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {previewModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/90 z-[80] flex items-center justify-center p-4">
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col">
-              <div className="flex justify-between p-4 border-b"><h3 className="font-bold truncate">{previewModal.name}</h3><button onClick={()=>setPreviewModal({isOpen:false, name:'', data:null})}><X/></button></div>
-              <div className="flex-1 bg-slate-100 flex items-center justify-center overflow-hidden p-4">
-                 {previewModal.data && previewModal.data.startsWith('data:image/') ? <img src={previewModal.data} className="max-w-full max-h-full object-contain" alt="preview"/> : <p>Vista no disponible o PDF descargable.</p>}
+      {/* Modal Ver Detalle de Pago */}
+      {isViewPagoModalOpen && selectedPagoModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800">Recibo de Pago Detallado</h2>
+              <button onClick={() => setIsViewPagoModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
+            </div>
+            <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto">
+              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 mb-6 flex flex-col items-center justify-center text-center">
+                 <p className="text-xs uppercase tracking-widest font-bold text-emerald-600 mb-1">Monto Recibido</p>
+                 <p className="text-4xl font-black text-emerald-700">S/ {selectedPagoModal.montoPagado}</p>
+                 <span className="mt-2 bg-white px-3 py-1 rounded-full text-xs font-bold text-slate-500 shadow-sm border border-slate-100">{selectedPagoModal.fechaPago}</span>
+                 
+                 {/* Desglose de Interés y Amortización */}
+                 {selectedPagoModal.concepto === 'Ambos (Interés + Amortización)' && (
+                   <div className="flex items-center gap-4 mt-4 w-full max-w-sm justify-center border-t border-emerald-200/60 pt-4">
+                     <div className="text-center">
+                       <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600/70 mb-0.5">Interés</p>
+                       <p className="text-sm font-bold text-emerald-800">S/ {selectedPagoModal.interesCobrado || '0.00'}</p>
+                     </div>
+                     <div className="text-emerald-400 font-black">+</div>
+                     <div className="text-center">
+                       <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600/70 mb-0.5">Amortización</p>
+                       <p className="text-sm font-bold text-emerald-800">S/ {(parseFloat(selectedPagoModal.montoPagado || 0) - parseFloat(selectedPagoModal.interesCobrado || 0)).toFixed(2)}</p>
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Desglose Inversionista */}
+                 {parseFloat(selectedPagoModal.interesInversionistas || 0) > 0 && (
+                   <div className="w-full max-w-sm mt-3 pt-3 border-t border-emerald-200/60 flex flex-col gap-1">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-emerald-700 font-medium">Interés Bruto Generado:</span>
+                        <span className="text-emerald-800 font-bold">S/ {(selectedPagoModal.concepto === 'Interés' ? selectedPagoModal.montoPagado : selectedPagoModal.interesCobrado)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-emerald-700 font-medium">Pago a Inversionista(s):</span>
+                        <span className="text-rose-600 font-bold">- S/ {selectedPagoModal.interesInversionistas}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs mt-1 bg-emerald-100/50 p-1.5 rounded">
+                        <span className="text-emerald-800 font-bold uppercase tracking-wider">Ganancia Real (Neta):</span>
+                        <span className="text-emerald-900 font-black">S/ {(parseFloat(selectedPagoModal.concepto === 'Interés' ? selectedPagoModal.montoPagado : selectedPagoModal.interesCobrado) - parseFloat(selectedPagoModal.interesInversionistas)).toFixed(2)}</span>
+                      </div>
+                   </div>
+                 )}
               </div>
-           </div>
+
+              <div className="grid grid-cols-2 gap-y-6 gap-x-4 px-2">
+                <div className="col-span-2 sm:col-span-1">
+                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-bold">Cliente Emitente</p>
+                  <p className="text-sm font-semibold text-slate-800">{selectedPagoModal.clienteNombre}</p>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-bold">Método / Banco</p>
+                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span> {selectedPagoModal.banco || '-'}
+                  </p>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-bold">Concepto de Pago</p>
+                  <p className="text-sm font-semibold text-slate-800">{selectedPagoModal.concepto}</p>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-bold">ID Transacción</p>
+                  <p className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded w-fit">{selectedPagoModal.id.slice(0,10)}</p>
+                </div>
+                
+                {selectedPagoModal.voucher && (
+                  <div className="col-span-2 mt-2 pt-4 border-t border-slate-100">
+                    <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-bold">Comprobante / Voucher</p>
+                    <button 
+                      onClick={() => openPreview(selectedPagoModal.voucher.name, selectedPagoModal.voucher.data)}
+                      className="flex items-center justify-center gap-2 text-sm font-bold text-[#3173c6] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-4 py-2.5 rounded-lg transition-colors w-full sm:w-fit"
+                    >
+                      <Eye size={18} /> Ver Documento Adjunto
+                    </button>
+                  </div>
+                )}
+                {selectedPagoModal.comentario && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Comentarios</p>
+                    <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200">{selectedPagoModal.comentario}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-5 border-t border-slate-200 flex justify-end bg-white sm:bg-slate-50">
+              <button onClick={() => setIsViewPagoModalOpen(false)} className="w-full sm:w-auto px-8 py-2.5 text-sm font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-sm transition-colors">Cerrar Recibo</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Previsualización de Archivos */}
+      {previewModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[70] flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col h-[90vh] sm:h-[85vh] animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+              <h3 className="font-bold text-slate-800 truncate pr-4 flex items-center gap-2 text-sm sm:text-base"><Eye size={18} className="text-[#3173c6] flex-shrink-0" /> <span className="truncate">{previewModal.name}</span></h3>
+              <button onClick={() => setPreviewModal({isOpen: false, name: '', data: null})} className="text-slate-500 hover:text-slate-800 bg-slate-200/50 hover:bg-slate-200 p-1.5 rounded-full transition-colors flex-shrink-0"><X size={20}/></button>
+            </div>
+            <div className="flex-1 bg-slate-100 flex items-center justify-center p-2 sm:p-4 overflow-hidden relative">
+              {previewModal.data ? (
+                previewModal.data.startsWith('data:image/') ? <img src={previewModal.data} alt="Vista Previa" className="max-w-full max-h-full object-contain shadow-lg rounded bg-white" />
+                : previewModal.data.startsWith('data:application/pdf') ? <iframe src={previewModal.data} className="w-full h-full rounded shadow-lg border-0 bg-white" title="PDF Preview" />
+                : <div className="text-center p-8"><FileText size={48} className="mb-3 opacity-50" /><p>Vista previa no disponible</p></div>
+              ) : (
+                <div className="text-center bg-white p-6 rounded-xl shadow-sm border mx-4">
+                  <Cloud size={64} className="mb-4 text-[#3173c6] mx-auto opacity-80" />
+                  <p className="text-lg font-bold">Archivo antiguo o sin datos</p>
+                  <p className="text-sm mt-3 text-slate-500">Para visualizar este archivo, necesitas volver a subirlo o implementar Firebase Cloud Storage.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
