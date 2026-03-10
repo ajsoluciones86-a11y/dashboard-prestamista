@@ -10,9 +10,6 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
-// ============================================================================
-// 1. CONFIGURACIÓN DE FIREBASE
-// ============================================================================
 const manualFirebaseConfig = {
   apiKey: "AIzaSyCz4997ZuPpvyaFee37fFeUn9SUE8QG7hQ",
   authDomain: "sistema-prestamos-43b76.firebaseapp.com",
@@ -51,7 +48,6 @@ const getConfigRef = (user) => {
   return doc(db, 'config', 'general');
 };
 
-// Función auxiliar para sumar 1 mes seguro
 const getFechaUnMesDespues = (fechaStr) => {
   if (!fechaStr) return '';
   const d = new Date(fechaStr + 'T00:00:00');
@@ -60,7 +56,6 @@ const getFechaUnMesDespues = (fechaStr) => {
   return d.toISOString().split('T')[0];
 };
 
-// Lógica Global de Estado de Préstamos
 const getEstadoPrestamo = (prestamo) => {
   const saldoActual = parseFloat(prestamo.saldo !== undefined ? prestamo.saldo : prestamo.monto);
   if (saldoActual <= 0) return 'Pagado';
@@ -75,7 +70,6 @@ const getEstadoPrestamo = (prestamo) => {
   } else {
     return 'Al día';
   }
-
   if (isNaN(fechaVencimiento.getTime())) return 'Al día';
 
   const hoy = new Date();
@@ -91,9 +85,6 @@ const getEstadoPrestamo = (prestamo) => {
 
 const UserContext = createContext(null);
 
-// ============================================================================
-// APP PRINCIPAL
-// ============================================================================
 export default function App() {
   const [currentView, setCurrentView] = useState('inicio');
   const [user, setUser] = useState(null);
@@ -154,12 +145,8 @@ export default function App() {
           </button>
         </div>
 
-        {/* Overlay oscuro para móvil cuando el menú está abierto */}
         {isMobileMenuOpen && (
-          <div 
-            className="md:hidden fixed inset-0 bg-slate-900/50 z-40 backdrop-blur-sm"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
+          <div className="md:hidden fixed inset-0 bg-slate-900/50 z-40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
         )}
 
         {/* Sidebar */}
@@ -186,16 +173,6 @@ export default function App() {
             <SidebarItem icon={<Lock size={18} />} label="Reportes" isActive={currentView === 'reportes'} onClick={() => navigateTo('reportes')} />
             <SidebarItem icon={<Calculator size={18} />} label="SUNAT" isActive={currentView === 'sunat'} onClick={() => navigateTo('sunat')} />
           </nav>
-
-          <div className="p-4 border-t border-[#407ac2]">
-            <div className="flex items-center gap-2 cursor-pointer text-blue-200 hover:text-white transition-colors">
-              <Settings size={18} />
-              <div className="flex flex-col gap-1 ml-1">
-                 <div className="w-6 h-1 bg-[#5b8ed4] rounded-full"></div>
-                 <div className="w-10 h-1 bg-[#5b8ed4] rounded-full"></div>
-              </div>
-            </div>
-          </div>
         </aside>
 
         <main className="flex-1 overflow-auto relative">
@@ -216,25 +193,15 @@ export default function App() {
 
 function SidebarItem({ icon, label, isActive, onClick }) {
   return (
-    <div 
-      onClick={onClick}
-      className={`flex items-center gap-3 px-6 py-3 cursor-pointer transition-colors ${
-        isActive ? 'bg-[#295c9e] border-l-4 border-white' : 'hover:bg-[#3876c4] border-l-4 border-transparent'
-      }`}
-    >
+    <div onClick={onClick} className={`flex items-center gap-3 px-6 py-3 cursor-pointer transition-colors ${isActive ? 'bg-[#295c9e] border-l-4 border-white' : 'hover:bg-[#3876c4] border-l-4 border-transparent'}`}>
       <span className={isActive ? 'text-white' : 'text-blue-100'}>{icon}</span>
       <span className={`text-sm ${isActive ? 'font-medium text-white' : 'text-blue-100'}`}>{label}</span>
     </div>
   );
 }
 
-// ============================================================================
-// VISTAS
-// ============================================================================
-
 function DashboardPrincipal() {
   const user = useContext(UserContext);
-  
   const [capitalPropio, setCapitalPropio] = useState(0);
   const [isEditingCapital, setIsEditingCapital] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
@@ -262,23 +229,14 @@ function DashboardPrincipal() {
         setCapitalInput(docSnap.data().capitalPropio || '');
       }
     });
-
-    const unsubInv = onSnapshot(invRef, (snap) => {
-      setCapitalInversionistas(snap.docs.reduce((sum, doc) => sum + parseFloat(doc.data().monto || 0), 0));
-    });
-
+    const unsubInv = onSnapshot(invRef, (snap) => setCapitalInversionistas(snap.docs.reduce((sum, doc) => sum + parseFloat(doc.data().monto || 0), 0)));
     const unsubPres = onSnapshot(presRef, (snap) => {
       const data = snap.docs.map(doc => doc.data());
       setPrestamosDb(data);
       setCapitalPrestado(data.reduce((sum, d) => sum + parseFloat(d.saldo !== undefined ? d.saldo : d.monto || 0), 0));
-      setInteresesACobrar(data.reduce((sum, d) => {
-        const saldo = parseFloat(d.saldo !== undefined ? d.saldo : d.monto || 0);
-        return sum + (saldo * (parseFloat(d.tasa || 0) / 100));
-      }, 0));
+      setInteresesACobrar(data.reduce((sum, d) => sum + (parseFloat(d.saldo !== undefined ? d.saldo : d.monto || 0) * (parseFloat(d.tasa || 0) / 100)), 0));
     });
-
     const unsubClientes = onSnapshot(cliRef, (snap) => setClientesNuevos(snap.docs.length));
-
     const unsubPagos = onSnapshot(pagRef, (snap) => {
       const data = snap.docs.map(doc => doc.data());
       setGananciaMes(data.reduce((sum, d) => {
@@ -298,8 +256,7 @@ function DashboardPrincipal() {
     setIsEditingCapital(false);
     const val = parseFloat(capitalInput) || 0;
     const confRef = getConfigRef(user);
-    if(!confRef) return;
-    await setDoc(confRef, { capitalPropio: val }, { merge: true });
+    if(confRef) await setDoc(confRef, { capitalPropio: val }, { merge: true });
   };
 
   const capitalDisponible = capitalPropio + capitalInversionistas - capitalPrestado;
@@ -310,7 +267,6 @@ function DashboardPrincipal() {
     <div className="w-full lg:max-w-3xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Dashboard Principal</h1>
-        <div className="flex items-center gap-1 text-slate-500 text-sm bg-white px-3 py-1.5 rounded-full shadow-sm"><Bell size={16} /><span className="ml-1 hidden sm:inline">Panel Activo</span></div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4 mb-4">
@@ -331,7 +287,6 @@ function DashboardPrincipal() {
           </div>
           <TrendingUp className="absolute -right-4 -bottom-4 opacity-20" size={80} />
         </div>
-        
         <div className="bg-[#2f78d4] rounded-lg shadow-sm p-5 text-white relative overflow-hidden flex flex-col justify-center min-h-[110px]">
           <div className="relative z-10">
             <div className="text-xs sm:text-sm font-medium mb-1 opacity-90">Capital Inversionistas</div>
@@ -339,7 +294,6 @@ function DashboardPrincipal() {
           </div>
           <BarChart2 className="absolute right-0 bottom-0 opacity-20" size={70} />
         </div>
-        
         <div className="bg-[#f24e4e] rounded-lg shadow-sm p-5 text-white relative overflow-hidden flex flex-col justify-center min-h-[110px]">
           <div className="relative z-10">
             <div className="text-xs sm:text-sm font-medium mb-1 opacity-90">Capital Prestado (Activo)</div>
@@ -347,7 +301,6 @@ function DashboardPrincipal() {
           </div>
           <Activity className="absolute -right-4 -bottom-4 opacity-20" size={80} />
         </div>
-        
         <div className="bg-[#f69d35] rounded-lg shadow-sm p-5 text-white relative overflow-hidden flex flex-col justify-center min-h-[110px]">
           <div className="relative z-10">
             <div className="text-xs sm:text-sm font-medium mb-1 opacity-90">Disponible</div>
@@ -419,29 +372,18 @@ function ListadoClientes() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
   const [clients, setClients] = useState([]);
   const [prestamos, setPrestamos] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [editingClientId, setEditingClientId] = useState(null);
-
-  const [form, setForm] = useState({
-    nombre: '', dni: '', telefono: '', direccion: '', banco: '', cuenta: ''
-  });
+  const [form, setForm] = useState({ nombre: '', dni: '', telefono: '', direccion: '', banco: '', cuenta: '' });
 
   useEffect(() => {
     const cliRef = getCollectionRef(user, 'clientes');
     const presRef = getCollectionRef(user, 'prestamos');
     if(!cliRef || !presRef) return;
-
-    const unsubC = onSnapshot(cliRef, (snapshot) => {
-      setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    
-    const unsubP = onSnapshot(presRef, (snapshot) => {
-      setPrestamos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    
+    const unsubC = onSnapshot(cliRef, (snapshot) => setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubP = onSnapshot(presRef, (snapshot) => setPrestamos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     return () => { unsubC(); unsubP(); };
   }, [user]);
 
@@ -450,61 +392,34 @@ function ListadoClientes() {
     setIsSaving(true);
     try {
       if (editingClientId) {
-        const docRef = getDocRef(user, 'clientes', editingClientId);
-        await updateDoc(docRef, { ...form });
+        await updateDoc(getDocRef(user, 'clientes', editingClientId), { ...form });
       } else {
-        const cliRef = getCollectionRef(user, 'clientes');
-        await addDoc(cliRef, { ...form, createdAt: serverTimestamp() });
+        await addDoc(getCollectionRef(user, 'clientes'), { ...form, createdAt: serverTimestamp() });
       }
       closeModal();
-    } catch (error) { 
-      console.error(error); 
-    } finally { 
-      setIsSaving(false); 
-    }
+    } catch (error) { console.error(error); } 
+    finally { setIsSaving(false); }
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingClientId(null);
-    setForm({ nombre: '', dni: '', telefono: '', direccion: '', banco: '', cuenta: '' });
-  };
-
-  const openNewClient = () => {
-    setForm({ nombre: '', dni: '', telefono: '', direccion: '', banco: '', cuenta: '' });
-    setEditingClientId(null);
-    setIsModalOpen(true);
-  };
-
-  const openEditClient = (client) => {
-    setForm({
-      nombre: client.nombre || '', dni: client.dni || '', telefono: client.telefono || '', 
-      direccion: client.direccion || '', banco: client.banco || '', cuenta: client.cuenta || ''
-    });
-    setEditingClientId(client.id);
-    setIsModalOpen(true);
-  };
-
-  const filteredClients = clients.filter(client => 
-    (client.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.dni || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (String(client.telefono) || '').includes(searchTerm)
-  );
-
+  const closeModal = () => { setIsModalOpen(false); setEditingClientId(null); setForm({ nombre: '', dni: '', telefono: '', direccion: '', banco: '', cuenta: '' }); };
+  const openNewClient = () => { setForm({ nombre: '', dni: '', telefono: '', direccion: '', banco: '', cuenta: '' }); setEditingClientId(null); setIsModalOpen(true); };
+  const openEditClient = (client) => { setForm({ ...client }); setEditingClientId(client.id); setIsModalOpen(true); };
+  
+  const filteredClients = clients.filter(c => (c.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.dni || '').includes(searchTerm));
   const getClientLoans = (clientId) => prestamos.filter(p => p.clienteId === clientId);
 
   return (
     <div className="w-full">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-700">Listado de Clientes</h1>
-        <button onClick={openNewClient} className="bg-[#3173c6] hover:bg-[#2860a8] text-white text-sm px-4 py-2.5 rounded shadow-sm flex items-center justify-center gap-2 transition-colors w-full sm:w-auto">
+        <button onClick={openNewClient} className="bg-[#3173c6] hover:bg-[#2860a8] text-white text-sm px-4 py-2.5 rounded shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto transition-colors">
           <span>+</span> Nuevo Cliente
         </button>
       </div>
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por nombre, DNI o teléfono..." className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm sm:text-base focus:outline-none focus:border-blue-400 shadow-sm bg-white" />
+        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por nombre o DNI..." className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm sm:text-base focus:outline-none focus:border-blue-400 shadow-sm" />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
@@ -520,177 +435,130 @@ function ListadoClientes() {
               </tr>
             </thead>
             <tbody>
-              {filteredClients.length > 0 ? (
-                filteredClients.map((client) => {
-                  const activeLoansCount = getClientLoans(client.id).filter(p => parseFloat(p.saldo !== undefined ? p.saldo : p.monto) > 0).length;
-                  return (
-                    <tr key={client.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4 sm:px-6 text-slate-700 font-medium">{client.nombre}</td>
-                      <td className="py-3 px-4 sm:px-6 text-slate-500">{client.dni || '-'}</td>
-                      <td className="py-3 px-4 sm:px-6 text-slate-600">{client.telefono}</td>
-                      <td className="py-3 px-4 sm:px-6 text-center">
-                        <span className="bg-slate-100 text-slate-700 py-1 px-3 rounded-full text-xs font-semibold">{activeLoansCount}</span>
-                      </td>
-                      <td className="py-3 px-4 sm:px-6 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => openEditClient(client)} className="bg-white text-slate-600 border border-slate-300 text-xs px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">
-                            Editar
-                          </button>
-                          <button onClick={() => { setSelectedClient(client); setIsViewModalOpen(true); }} className="bg-[#3173c6] text-white text-xs px-3 py-1.5 rounded hover:bg-[#2860a8] shadow-sm transition-colors">
-                            Ver
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr><td colSpan="5" className="py-10 text-center text-slate-500">No se encontraron clientes.</td></tr>
-              )}
+              {filteredClients.length > 0 ? filteredClients.map((client) => {
+                const activeLoansCount = getClientLoans(client.id).filter(p => parseFloat(p.saldo !== undefined ? p.saldo : p.monto) > 0).length;
+                return (
+                  <tr key={client.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-4 sm:px-6 text-slate-700 font-medium">{client.nombre}</td>
+                    <td className="py-3 px-4 sm:px-6 text-slate-500">{client.dni || '-'}</td>
+                    <td className="py-3 px-4 sm:px-6 text-slate-600">{client.telefono}</td>
+                    <td className="py-3 px-4 sm:px-6 text-center"><span className="bg-slate-100 text-slate-700 py-1 px-3 rounded-full text-xs font-semibold">{activeLoansCount}</span></td>
+                    <td className="py-3 px-4 sm:px-6 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => openEditClient(client)} className="bg-white text-slate-600 border border-slate-300 text-xs px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">Editar</button>
+                        <button onClick={() => { setSelectedClient(client); setIsViewModalOpen(true); }} className="bg-[#3173c6] text-white text-xs px-3 py-1.5 rounded hover:bg-[#2860a8] transition-colors shadow-sm">Ver</button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }) : <tr><td colSpan="5" className="py-10 text-center text-slate-500">No se encontraron clientes.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Nuevo/Editar Cliente */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b bg-slate-50">
               <h2 className="text-lg font-bold text-slate-800">{editingClientId ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}</h2>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
+              <button onClick={closeModal} className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
             </div>
-            <div className="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nombre Completo</label>
-                <input type="text" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] transition-shadow bg-slate-50 focus:bg-white" placeholder="Ej. Juan Pérez" />
+                <label className="block text-sm font-medium mb-1 text-slate-700">Nombre Completo</label>
+                <input type="text" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none focus:ring-1 focus:ring-blue-500 transition-all bg-slate-50 focus:bg-white" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">DNI</label>
-                  <input type="text" value={form.dni} onChange={e=>setForm({...form, dni: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] transition-shadow bg-slate-50 focus:bg-white" placeholder="Ej. 12345678" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Teléfono</label>
-                  <input type="tel" value={form.telefono} onChange={e=>setForm({...form, telefono: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] transition-shadow bg-slate-50 focus:bg-white" placeholder="Ej. 987 654 321" />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-sm font-medium mb-1 text-slate-700">DNI</label><input type="text" value={form.dni} onChange={e=>setForm({...form, dni: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none focus:ring-1 focus:ring-blue-500 transition-all bg-slate-50 focus:bg-white" /></div>
+                <div><label className="block text-sm font-medium mb-1 text-slate-700">Teléfono</label><input type="tel" value={form.telefono} onChange={e=>setForm({...form, telefono: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none focus:ring-1 focus:ring-blue-500 transition-all bg-slate-50 focus:bg-white" /></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Dirección</label>
-                <input type="text" value={form.direccion} onChange={e=>setForm({...form, direccion: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] transition-shadow bg-slate-50 focus:bg-white" placeholder="Ej. Av. Principal 123, Ciudad" />
+                <label className="block text-sm font-medium mb-1 text-slate-700">Dirección</label>
+                <input type="text" value={form.direccion} onChange={e=>setForm({...form, direccion: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none focus:ring-1 focus:ring-blue-500 transition-all bg-slate-50 focus:bg-white" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Banco</label>
+                  <label className="block text-sm font-medium mb-1 text-slate-700">Banco</label>
                   <div className="relative">
-                    <select value={form.banco} onChange={e=>setForm({...form, banco: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] appearance-none transition-shadow bg-slate-50 focus:bg-white">
+                    <select value={form.banco} onChange={e=>setForm({...form, banco: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none focus:ring-1 focus:ring-blue-500 appearance-none bg-slate-50 focus:bg-white transition-all">
                       <option value="">Seleccione...</option><option>BCP</option><option>Interbank</option><option>BBVA</option><option>Scotiabank</option><option>BanBif</option><option>Otro</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Nro. de Cuenta</label>
-                  <input type="text" value={form.cuenta} onChange={e=>setForm({...form, cuenta: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] transition-shadow bg-slate-50 focus:bg-white" placeholder="Ej. 191-1234567-0-00" />
+                  <label className="block text-sm font-medium mb-1 text-slate-700">Nro. de Cuenta</label>
+                  <input type="text" value={form.cuenta} onChange={e=>setForm({...form, cuenta: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none focus:ring-1 focus:ring-blue-500 transition-all bg-slate-50 focus:bg-white" />
                 </div>
               </div>
             </div>
-            <div className="p-5 border-t border-slate-200 flex justify-end gap-3 bg-white sm:bg-slate-50">
-              <button onClick={closeModal} className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200 sm:border-transparent">Cancelar</button>
-              <button onClick={handleGuardarCliente} disabled={isSaving} className="w-full sm:w-auto px-6 py-2.5 text-sm font-medium text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
-                {isSaving ? <RefreshCcw size={16} className="animate-spin" /> : editingClientId ? 'Actualizar Cliente' : 'Guardar Cliente'}
+            <div className="p-5 border-t flex justify-end gap-3 bg-slate-50">
+              <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200">Cancelar</button>
+              <button onClick={handleGuardarCliente} disabled={isSaving} className="px-6 py-2.5 text-sm font-bold text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                {isSaving ? <RefreshCcw size={16} className="animate-spin"/> : 'Guardar Cliente'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Ver Detalles */}
       {isViewModalOpen && selectedClient && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800 truncate pr-2">Detalles - {selectedClient.nombre}</h2>
-              <button onClick={() => setIsViewModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors flex-shrink-0"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b bg-slate-50 flex-shrink-0">
+              <h2 className="text-lg font-bold text-slate-800">Detalles - {selectedClient.nombre}</h2>
+              <button onClick={() => setIsViewModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
             </div>
-            
-            <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto bg-slate-50/50">
-              {(() => {
-                const clientLoans = getClientLoans(selectedClient.id);
-                const activeLoansCount = clientLoans.filter(p => parseFloat(p.saldo !== undefined ? p.saldo : p.monto) > 0).length;
-                return (
-                  <>
-                    <div className="mb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm gap-4">
-                      <div>
-                        <p className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Préstamos Activos</p>
-                        <p className="font-bold text-slate-800 text-2xl">{activeLoansCount}</p>
-                      </div>
-                      <div className="sm:text-right">
-                        <p className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Saldo Deudor Total</p>
-                        <p className="font-bold text-[#3173c6] text-2xl">
-                          {new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(
-                            clientLoans.reduce((acc, loan) => acc + parseFloat(loan.saldo !== undefined ? loan.saldo : loan.monto || 0), 0)
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col gap-4">
-                      {clientLoans.length === 0 ? (
-                        <p className="text-center text-slate-500 py-8 bg-white rounded-xl border border-slate-200">Este cliente no tiene préstamos registrados.</p>
-                      ) : (
-                        clientLoans.map((loan) => {
-                          const estado = getEstadoPrestamo(loan);
-                          return (
-                            <div key={loan.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                              <div className="flex flex-wrap gap-2 justify-between items-center mb-4 pb-3 border-b border-slate-100">
-                                <h3 className="font-bold text-[#3173c6] flex items-center gap-1.5"><Briefcase size={16}/> ID: {loan.id.slice(0,6)}</h3>
-                                <span className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-[10px] font-bold uppercase tracking-wide
-                                  ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 
-                                    estado === 'Vencido' ? 'bg-rose-100 text-rose-800' : 
-                                    estado === 'Congelado' ? 'bg-cyan-100 text-cyan-800' :
-                                    'bg-amber-100 text-amber-800'}`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full 
-                                    ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-600' : 
-                                      estado === 'Vencido' ? 'bg-rose-600' : 
-                                      estado === 'Congelado' ? 'bg-cyan-600' :
-                                      'bg-amber-600'}`}></span>
-                                  {estado}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-y-5 gap-x-4">
-                                <div>
-                                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-semibold">Fecha Inicio</p>
-                                  <p className="text-sm font-semibold text-slate-700">{loan.fecha || '-'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-semibold">Monto Orig.</p>
-                                  <p className="text-sm font-semibold text-slate-700">S/ {loan.monto}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-semibold">Saldo Actual</p>
-                                  <p className="text-sm font-bold text-rose-600">S/ {loan.saldo !== undefined ? loan.saldo : loan.monto}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-semibold">Interés Mes</p>
-                                  <p className="text-sm font-semibold text-slate-700">{loan.tasa}%</p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-semibold">Próximo Pago</p>
-                                  <p className="text-sm font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded inline-block">{loan.proximaFechaPago || getFechaUnMesDespues(loan.fecha)}</p>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
+            <div className="p-6 overflow-y-auto bg-slate-50/50">
+               {/* Client View Panel */}
+               <div className="mb-5 flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm gap-4">
+                 <div>
+                   <p className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Préstamos Activos</p>
+                   <p className="font-bold text-slate-800 text-2xl">{getClientLoans(selectedClient.id).filter(p => parseFloat(p.saldo !== undefined ? p.saldo : p.monto) > 0).length}</p>
+                 </div>
+                 <div className="text-right">
+                   <p className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Saldo Deudor Total</p>
+                   <p className="font-bold text-[#3173c6] text-2xl">
+                     S/ {getClientLoans(selectedClient.id).reduce((acc, loan) => acc + parseFloat(loan.saldo !== undefined ? loan.saldo : loan.monto || 0), 0).toFixed(2)}
+                   </p>
+                 </div>
+               </div>
+
+               <p className="font-bold mb-4 text-slate-700 flex items-center gap-2"><Briefcase size={18}/> Préstamos Registrados</p>
+               <div className="flex flex-col gap-4">
+                  {getClientLoans(selectedClient.id).length === 0 ? (
+                    <p className="text-center text-slate-500 py-6 bg-white rounded border border-slate-200">Este cliente no tiene préstamos registrados.</p>
+                  ) : (
+                    getClientLoans(selectedClient.id).map(loan => {
+                      const estado = getEstadoPrestamo(loan);
+                      return (
+                        <div key={loan.id} className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                           <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                             <span className="font-bold text-[#3173c6]">ID: {loan.id.slice(0,6)}</span>
+                             <span className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-[10px] font-bold uppercase tracking-wide
+                                ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 
+                                  estado === 'Vencido' ? 'bg-rose-100 text-rose-800' : 
+                                  estado === 'Congelado' ? 'bg-cyan-100 text-cyan-800' :
+                                  'bg-amber-100 text-amber-800'}`}>
+                                {estado}
+                             </span>
+                           </div>
+                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                             <div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Fecha Inicio</p><p className="text-sm font-semibold">{loan.fecha}</p></div>
+                             <div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Monto Orig.</p><p className="text-sm font-semibold">S/ {loan.monto}</p></div>
+                             <div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Saldo Actual</p><p className="text-sm font-bold text-rose-600">S/ {loan.saldo !== undefined ? loan.saldo : loan.monto}</p></div>
+                             <div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Tasa</p><p className="text-sm font-semibold">{loan.tasa}%</p></div>
+                             <div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Próx. Pago</p><p className="text-sm font-semibold bg-slate-100 px-2 py-0.5 rounded w-fit">{loan.proximaFechaPago || getFechaUnMesDespues(loan.fecha)}</p></div>
+                           </div>
+                        </div>
+                      )
+                    })
+                  )}
+               </div>
             </div>
-            <div className="p-5 border-t border-slate-200 flex justify-end bg-white sm:bg-slate-50">
-              <button onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto px-8 py-2.5 text-sm font-medium text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm transition-colors">Cerrar</button>
+            <div className="p-5 border-t flex justify-end bg-slate-50 flex-shrink-0">
+              <button onClick={() => setIsViewModalOpen(false)} className="px-8 py-2.5 bg-[#3173c6] text-sm font-bold text-white rounded-lg shadow-sm hover:bg-[#2860a8] transition-colors">Cerrar</button>
             </div>
           </div>
         </div>
@@ -701,7 +569,6 @@ function ListadoClientes() {
 
 function ListadoPrestamos() {
   const user = useContext(UserContext);
-  
   const [clientsDb, setClientsDb] = useState([]);
   const [investorsDb, setInvestorsDb] = useState([]);
   const [prestamosDb, setPrestamosDb] = useState([]);
@@ -714,14 +581,10 @@ function ListadoPrestamos() {
   const [isViewLoanModalOpen, setIsViewLoanModalOpen] = useState(false);
   const [selectedLoanView, setSelectedLoanView] = useState(null);
 
-  const [form, setForm] = useState({
-    fecha: '', clienteId: '', monto: '', tasa: '', cuotas: '12', congelado: false
-  });
-  
+  const [form, setForm] = useState({ fecha: '', clienteId: '', monto: '', tasa: '', cuotas: '12', congelado: false });
   const [financingSources, setFinancingSources] = useState(['propio']);
   const [isCuotaFija, setIsCuotaFija] = useState(true);
   const [montoCuota, setMontoCuota] = useState('');
-  
   const [selectedBanks, setSelectedBanks] = useState([]);
   const [bankAmounts, setBankAmounts] = useState({});
   const [bankVouchers, setBankVouchers] = useState({});
@@ -744,19 +607,15 @@ function ListadoPrestamos() {
     const presRef = getCollectionRef(user, 'prestamos');
     if(!cliRef || !invRef || !presRef) return;
 
-    const unsubC = onSnapshot(cliRef, (snap) => setClientsDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    const unsubI = onSnapshot(invRef, (snap) => setInvestorsDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    const unsubP = onSnapshot(presRef, (snap) => setPrestamosDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    
+    const unsubC = onSnapshot(cliRef, snap => setClientsDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubI = onSnapshot(invRef, snap => setInvestorsDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubP = onSnapshot(presRef, snap => setPrestamosDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
     return () => { unsubC(); unsubI(); unsubP(); };
   }, [user]);
 
   const toggleFinancingSource = (source) => {
-    if (financingSources.includes(source)) {
-      setFinancingSources(financingSources.filter(s => s !== source));
-    } else {
-      setFinancingSources([...financingSources, source]);
-    }
+    if (financingSources.includes(source)) setFinancingSources(financingSources.filter(s => s !== source));
+    else setFinancingSources([...financingSources, source]);
   };
 
   const toggleBank = (bank) => {
@@ -764,18 +623,14 @@ function ListadoPrestamos() {
       setSelectedBanks(selectedBanks.filter(b => b !== bank));
       const newAmounts = { ...bankAmounts }; delete newAmounts[bank]; setBankAmounts(newAmounts);
       const newVouchers = { ...bankVouchers }; delete newVouchers[bank]; setBankVouchers(newVouchers);
-    } else {
-      setSelectedBanks([...selectedBanks, bank]);
-    }
+    } else setSelectedBanks([...selectedBanks, bank]);
   };
 
   const toggleInvestor = (invId) => {
     if (selectedInvestors.includes(invId)) {
       setSelectedInvestors(selectedInvestors.filter(i => i !== invId));
       const newAmounts = { ...investorAmounts }; delete newAmounts[invId]; setInvestorAmounts(newAmounts);
-    } else {
-      setSelectedInvestors([...selectedInvestors, invId]);
-    }
+    } else setSelectedInvestors([...selectedInvestors, invId]);
   };
 
   const handleBankAmountChange = (bank, amount) => setBankAmounts({ ...bankAmounts, [bank]: amount });
@@ -786,9 +641,7 @@ function ListadoPrestamos() {
     if (!file) return;
     if (file.size > 800000) return alert('El archivo es demasiado grande (máx 800KB).'); 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setBankVouchers(prev => ({ ...prev, [bank]: { name: file.name, data: reader.result } })); 
-    };
+    reader.onloadend = () => { setBankVouchers(prev => ({ ...prev, [bank]: { name: file.name, data: reader.result } })); };
     reader.readAsDataURL(file);
   };
 
@@ -797,19 +650,14 @@ function ListadoPrestamos() {
     if (!file) return;
     if (file.size > 800000) return alert('El archivo es demasiado grande (máx 800KB).'); 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setDocumentFile({ name: file.name, data: reader.result }); 
-    };
+    reader.onloadend = () => { setDocumentFile({ name: file.name, data: reader.result }); };
     reader.readAsDataURL(file);
   };
 
-  const openPreview = (name, data) => {
-    setPreviewModal({ isOpen: true, name, data });
-  };
+  const openPreview = (name, data) => setPreviewModal({ isOpen: true, name, data });
 
   const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingLoanId(null);
+    setIsModalOpen(false); setEditingLoanId(null);
     setForm({fecha: '', clienteId: '', monto: '', tasa: '', cuotas: '12', congelado: false});
     setFinancingSources(['propio']); setIsCuotaFija(true); setMontoCuota('');
     setBankAmounts({}); setBankVouchers({}); setSelectedBanks([]);
@@ -817,34 +665,21 @@ function ListadoPrestamos() {
     setComments(''); setDocumentStatus('No Firmado'); setDocumentFile(null);
   };
 
-  const openNewLoan = () => {
-    closeModal(); 
-    setIsModalOpen(true);
-  };
+  const openNewLoan = () => { closeModal(); setIsModalOpen(true); };
 
   const openEditLoan = (loan) => {
     setForm({
-      fecha: loan.fecha || '', 
-      clienteId: loan.clienteId || '', 
-      monto: loan.monto || '', 
-      tasa: loan.tasa || '', 
-      cuotas: loan.cuotas || '12',
-      congelado: loan.congelado || false
+      fecha: loan.fecha || '', clienteId: loan.clienteId || '', monto: loan.monto || '', 
+      tasa: loan.tasa || '', cuotas: loan.cuotas || '12', congelado: loan.congelado || false
     });
     setFinancingSources(loan.financingSources || ['propio']);
     setIsCuotaFija(loan.isCuotaFija !== undefined ? loan.isCuotaFija : true);
     setMontoCuota(loan.montoCuota || '');
-    setSelectedBanks(loan.selectedBanks || []);
-    setBankAmounts(loan.bankAmounts || {});
-    setBankVouchers(loan.bankVouchers || {});
-    setSelectedInvestors(loan.selectedInvestors || []);
-    setInvestorAmounts(loan.investorAmounts || {});
-    setDocumentStatus(loan.documentStatus || 'No Firmado');
-    setDocumentFile(loan.documentFile || null);
+    setSelectedBanks(loan.selectedBanks || []); setBankAmounts(loan.bankAmounts || {}); setBankVouchers(loan.bankVouchers || {});
+    setSelectedInvestors(loan.selectedInvestors || []); setInvestorAmounts(loan.investorAmounts || {});
+    setDocumentStatus(loan.documentStatus || 'No Firmado'); setDocumentFile(loan.documentFile || null);
     setComments(loan.comments || '');
-    
-    setEditingLoanId(loan.id);
-    setIsModalOpen(true);
+    setEditingLoanId(loan.id); setIsModalOpen(true);
   };
 
   const handleGuardarPrestamo = async () => {
@@ -852,76 +687,42 @@ function ListadoPrestamos() {
     setIsSaving(true);
     try {
       const clienteData = clientsDb.find(c => c.id === form.clienteId);
-      
       const payload = {
-        ...form,
-        clienteNombre: clienteData ? clienteData.nombre : 'Desconocido',
-        financingSources,
-        isCuotaFija,
-        montoCuota,
-        selectedBanks,
-        bankAmounts,
-        bankVouchers, 
-        selectedInvestors,
-        investorAmounts,
-        documentStatus,
-        documentFile, 
-        comments,
-        congelado: form.congelado || false
+        ...form, clienteNombre: clienteData ? clienteData.nombre : 'Desconocido',
+        financingSources, isCuotaFija, montoCuota, selectedBanks, bankAmounts, bankVouchers, 
+        selectedInvestors, investorAmounts, documentStatus, documentFile, comments, congelado: form.congelado || false
       };
-
       if (editingLoanId) {
-        const docRef = getDocRef(user, 'prestamos', editingLoanId);
-        await updateDoc(docRef, payload);
+        await updateDoc(getDocRef(user, 'prestamos', editingLoanId), payload);
       } else {
-        const presRef = getCollectionRef(user, 'prestamos');
-        const proximaFecha = getFechaUnMesDespues(form.fecha);
-        await addDoc(presRef, {
-          ...payload,
-          saldo: form.monto, 
-          proximaFechaPago: proximaFecha, 
-          createdAt: serverTimestamp()
-        });
+        await addDoc(getCollectionRef(user, 'prestamos'), { ...payload, saldo: form.monto, proximaFechaPago: getFechaUnMesDespues(form.fecha), createdAt: serverTimestamp() });
       }
       closeModal();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (error) { console.error(error); } finally { setIsSaving(false); }
   };
 
-  const filteredPrestamos = prestamosDb.filter(p => 
-    (p.clienteNombre || '').toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+  const filteredPrestamos = prestamosDb.filter(p => (p.clienteNombre || '').toLowerCase().includes(searchTerm.toLowerCase())).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
 
   const getDesgloseGanancias = (prestamo) => {
     if (!prestamo) return { interesBruto: 0, gananciaInversionistas: 0, miGananciaReal: 0 };
-    
     const saldoActual = parseFloat(prestamo.saldo !== undefined ? prestamo.saldo : prestamo.monto);
     const tasaPrestamo = parseFloat(prestamo.tasa || 0);
     const interesBruto = saldoActual * (tasaPrestamo / 100);
-
     let gananciaInversionistas = 0;
     if (prestamo.financingSources?.includes('inversionista') && prestamo.selectedInvestors) {
       prestamo.selectedInvestors.forEach(invId => {
          const inv = investorsDb.find(i => i.id === invId);
-         const montoInv = parseFloat(prestamo.investorAmounts?.[invId] || 0);
-         const tasaInv = parseFloat(inv?.tasa || 0);
-         gananciaInversionistas += (montoInv * (tasaInv / 100));
+         gananciaInversionistas += (parseFloat(prestamo.investorAmounts?.[invId] || 0) * (parseFloat(inv?.tasa || 0) / 100));
       });
     }
-
-    const miGananciaReal = Math.max(0, interesBruto - gananciaInversionistas);
-
-    return { interesBruto, gananciaInversionistas, miGananciaReal };
+    return { interesBruto, gananciaInversionistas, miGananciaReal: Math.max(0, interesBruto - gananciaInversionistas) };
   };
 
   return (
     <div className="w-full">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-700">Listado de Préstamos</h1>
-        <button onClick={openNewLoan} className="bg-[#3173c6] hover:bg-[#2860a8] text-white text-sm px-4 py-2.5 rounded shadow-sm flex items-center justify-center gap-2 transition-colors w-full sm:w-auto">
+        <button onClick={openNewLoan} className="bg-[#3173c6] hover:bg-[#2860a8] text-white text-sm px-4 py-2.5 rounded shadow-sm flex items-center justify-center gap-2 transition-colors w-full sm:w-auto font-bold">
           <span>+</span> Nuevo Préstamo
         </button>
       </div>
@@ -946,48 +747,40 @@ function ListadoPrestamos() {
               </tr>
             </thead>
             <tbody>
-              {filteredPrestamos.length > 0 ? (
-                filteredPrestamos.map((p) => {
-                  const estado = getEstadoPrestamo(p);
-                  return (
-                    <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4 sm:px-6 text-slate-600">{p.fecha || '-'}</td>
-                      <td className="py-3 px-4 sm:px-6 text-slate-700 font-medium">{p.clienteNombre}</td>
-                      <td className="py-3 px-4 sm:px-6">
-                        <span className="text-slate-800 font-semibold block leading-tight">S/ {parseFloat(p.saldo !== undefined ? p.saldo : p.monto).toFixed(2)}</span>
-                        <span className="text-[10px] text-slate-400">Orig: S/ {p.monto}</span>
-                      </td>
-                      <td className="py-3 px-4 sm:px-6 text-slate-800 font-medium">{p.proximaFechaPago || getFechaUnMesDespues(p.fecha)}</td>
-                      <td className="py-3 px-4 sm:px-6 text-center">
-                        <span className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-[10px] font-bold uppercase tracking-wide
-                          ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 
-                            estado === 'Vencido' ? 'bg-rose-100 text-rose-800' : 
-                            estado === 'Congelado' ? 'bg-cyan-100 text-cyan-800' :
-                            'bg-amber-100 text-amber-800'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full 
-                            ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-600' : 
-                              estado === 'Vencido' ? 'bg-rose-600' : 
-                              estado === 'Congelado' ? 'bg-cyan-600' :
-                              'bg-amber-600'}`}></span>
-                          {estado}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 sm:px-6 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => openEditLoan(p)} className="bg-white border border-slate-300 text-slate-600 text-xs px-4 py-1.5 rounded hover:bg-slate-50 transition-colors">
-                            Editar
-                          </button>
-                          <button onClick={() => { setSelectedLoanView(p); setIsViewLoanModalOpen(true); }} className="bg-[#3173c6] text-white text-xs px-3 py-1.5 rounded hover:bg-[#2860a8] shadow-sm transition-colors">
-                            Detalles
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr><td colSpan="6" className="py-10 text-center text-slate-500">No hay préstamos registrados o que coincidan con la búsqueda.</td></tr>
-              )}
+              {filteredPrestamos.length > 0 ? filteredPrestamos.map((p) => {
+                const estado = getEstadoPrestamo(p);
+                return (
+                  <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-4 sm:px-6 text-slate-600">{p.fecha || '-'}</td>
+                    <td className="py-3 px-4 sm:px-6 text-slate-700 font-medium">{p.clienteNombre}</td>
+                    <td className="py-3 px-4 sm:px-6">
+                      <span className="text-slate-800 font-semibold block leading-tight">S/ {parseFloat(p.saldo !== undefined ? p.saldo : p.monto).toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-400">Orig: S/ {p.monto}</span>
+                    </td>
+                    <td className="py-3 px-4 sm:px-6 text-slate-800 font-medium">{p.proximaFechaPago || getFechaUnMesDespues(p.fecha)}</td>
+                    <td className="py-3 px-4 sm:px-6 text-center">
+                      <span className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-[10px] font-bold uppercase tracking-wide
+                        ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 
+                          estado === 'Vencido' ? 'bg-rose-100 text-rose-800' : 
+                          estado === 'Congelado' ? 'bg-cyan-100 text-cyan-800' :
+                          'bg-amber-100 text-amber-800'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full 
+                          ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-600' : 
+                            estado === 'Vencido' ? 'bg-rose-600' : 
+                            estado === 'Congelado' ? 'bg-cyan-600' :
+                            'bg-amber-600'}`}></span>
+                        {estado}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 sm:px-6 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => openEditLoan(p)} className="bg-white border border-slate-300 text-slate-600 text-xs px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">Editar</button>
+                        <button onClick={() => { setSelectedLoanView(p); setIsViewLoanModalOpen(true); }} className="bg-[#3173c6] text-white text-xs px-3 py-1.5 rounded hover:bg-[#2860a8] shadow-sm transition-colors">Detalles</button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }) : <tr><td colSpan="6" className="py-10 text-center text-slate-500">No hay préstamos registrados o que coincidan con la búsqueda.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -995,8 +788,8 @@ function ListadoPrestamos() {
 
       {/* Modal Formulario de Préstamo */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200 flex flex-col max-h-[90vh] sm:max-h-[85vh]">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]">
             <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
               <h2 className="text-lg font-bold text-slate-800">{editingLoanId ? 'Editar Préstamo' : 'Nuevo Préstamo'}</h2>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
@@ -1016,9 +809,7 @@ function ListadoPrestamos() {
                 <div className="w-full sm:w-2/3 relative">
                   <select value={form.clienteId} onChange={e=>setForm({...form, clienteId: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-700 appearance-none focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-all">
                     <option value="">Seleccione un cliente...</option>
-                    {clientsDb.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
+                    {clientsDb.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
                 </div>
@@ -1044,9 +835,7 @@ function ListadoPrestamos() {
                 <label className="text-sm font-medium text-slate-700 w-full sm:w-1/3 mb-1.5 sm:mb-0">Número de Cuotas</label>
                 <div className="w-full sm:w-2/3 relative">
                   <select value={form.cuotas} onChange={e=>setForm({...form, cuotas: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 font-medium appearance-none focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-all pr-8">
-                    {[...Array(36)].map((_, i) => (
-                      <option key={i+1} value={i+1}>{i+1} Meses</option>
-                    ))}
+                    {[...Array(36)].map((_, i) => <option key={i+1} value={i+1}>{i+1} Meses</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                 </div>
@@ -1060,11 +849,11 @@ function ListadoPrestamos() {
                      <div className={`w-3 h-3 rounded-full transition-colors ${isCuotaFija ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`}></div>
                   </div>
                   {isCuotaFija && (
-                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
                       <span className="text-xs font-medium text-slate-600">Monto por cuota:</span>
                       <div className="relative flex-1">
                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 text-sm font-bold">S/</span>
-                        <input type="number" value={montoCuota} onChange={(e) => setMontoCuota(e.target.value)} placeholder="0.00" className="w-full border border-slate-300 rounded-md p-2 pl-8 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] transition-all"/>
+                        <input type="number" value={montoCuota} onChange={(e) => setMontoCuota(e.target.value)} placeholder="0.00" className="w-full border border-slate-300 rounded-md p-2 pl-8 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#3173c6]"/>
                       </div>
                     </div>
                   )}
@@ -1074,22 +863,20 @@ function ListadoPrestamos() {
               <div className="flex flex-col sm:flex-row sm:items-start justify-between border-b border-slate-100 pb-4">
                 <label className="text-sm font-medium text-slate-700 w-full sm:w-1/3 mb-2 sm:mb-0 sm:mt-2">Banco(s):</label>
                 <div className="w-full sm:w-2/3 relative">
-                  <div className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-700 bg-slate-50 focus-within:bg-white min-h-[42px] flex flex-wrap gap-2 cursor-pointer items-center pr-8 transition-colors" onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}>
+                  <div className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-700 bg-slate-50 min-h-[42px] flex flex-wrap gap-2 cursor-pointer items-center pr-8" onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}>
                     {selectedBanks.length === 0 && <span className="text-slate-400">Seleccione métodos...</span>}
                     {selectedBanks.map(bank => (
                       <span key={bank} className="bg-white border border-slate-200 shadow-sm text-slate-700 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5">
-                        {bank}
-                        <X size={12} className="cursor-pointer text-slate-400 hover:text-rose-500 transition-colors" onClick={(e) => { e.stopPropagation(); toggleBank(bank); }}/>
+                        {bank} <X size={12} className="cursor-pointer text-slate-400 hover:text-rose-500" onClick={(e) => { e.stopPropagation(); toggleBank(bank); }}/>
                       </span>
                     ))}
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
                   </div>
                   {isBankDropdownOpen && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto overflow-x-hidden">
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                       {availableBanks.map(bank => (
-                        <label key={bank} className="flex items-center gap-3 p-3 text-sm font-medium text-slate-700 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 m-0 transition-colors">
-                          <input type="checkbox" checked={selectedBanks.includes(bank)} onChange={() => toggleBank(bank)} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4"/>
-                          {bank}
+                        <label key={bank} className="flex items-center gap-3 p-3 text-sm font-medium text-slate-700 hover:bg-blue-50 cursor-pointer border-b">
+                          <input type="checkbox" checked={selectedBanks.includes(bank)} onChange={() => toggleBank(bank)} className="rounded border-slate-300 text-[#3173c6] w-4 h-4"/> {bank}
                         </label>
                       ))}
                     </div>
@@ -1104,31 +891,25 @@ function ListadoPrestamos() {
                       const voucherObj = bankVouchers[bank];
                       const vName = voucherObj ? (typeof voucherObj === 'string' ? voucherObj : voucherObj.name) : null;
                       const vData = voucherObj && typeof voucherObj !== 'string' ? voucherObj.data : null;
-
                       return (
-                        <div key={bank} className="flex flex-col gap-3 bg-blue-50/30 border border-blue-100 p-3.5 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-2">
+                        <div key={bank} className="flex flex-col gap-3 bg-blue-50/30 border border-blue-100 p-3.5 rounded-xl shadow-sm">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-800 font-bold">{bank}</span>
                             <div className="flex items-center gap-1.5 relative">
                               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 font-medium text-sm">S/</span>
-                              <input type="number" placeholder="0.00" value={bankAmounts[bank] || ''} onChange={(e) => handleBankAmountChange(bank, e.target.value)} className="w-28 sm:w-32 border border-slate-300 rounded-md p-1.5 pl-8 text-sm text-right font-bold text-slate-800 focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6]" />
+                              <input type="number" placeholder="0.00" value={bankAmounts[bank] || ''} onChange={(e) => handleBankAmountChange(bank, e.target.value)} className="w-28 sm:w-32 border border-slate-300 rounded-md p-1.5 pl-8 text-sm text-right font-bold text-slate-800 focus:outline-none focus:border-[#3173c6]"/>
                             </div>
                           </div>
                           <div className="flex justify-between items-center border-t border-blue-100/50 pt-3">
-                            <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider font-bold">Comprobante</span>
+                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Comprobante</span>
                             <div className="flex items-center gap-2">
                               <div className="relative overflow-hidden inline-block">
-                                <button className="text-xs bg-white border border-slate-300 hover:border-[#3173c6] hover:text-[#3173c6] px-3 py-1.5 rounded-md text-slate-600 font-medium flex items-center gap-1.5 cursor-pointer max-w-[140px] transition-colors">
-                                  <Upload size={12} className="flex-shrink-0" /> 
-                                  <span className="truncate">{vName || 'Subir archivo'}</span>
+                                <button className="text-xs bg-white border border-slate-300 hover:border-[#3173c6] px-3 py-1.5 rounded-md text-slate-600 font-medium flex items-center gap-1.5 cursor-pointer max-w-[140px]">
+                                  <Upload size={12} className="flex-shrink-0" /> <span className="truncate">{vName || 'Subir archivo'}</span>
                                 </button>
                                 <input type="file" onChange={(e) => handleBankVoucherUpload(bank, e)} className="absolute left-0 top-0 opacity-0 cursor-pointer w-full h-full" />
                               </div>
-                              {vName && (
-                                <button onClick={(e) => { e.preventDefault(); openPreview(vName, vData); }} className="text-[#3173c6] bg-white hover:bg-blue-50 p-1.5 rounded-md border border-slate-300 shadow-sm transition-colors" title="Ver comprobante">
-                                  <Eye size={14} />
-                                </button>
-                              )}
+                              {vName && <button onClick={(e) => { e.preventDefault(); openPreview(vName, vData); }} className="text-[#3173c6] bg-white p-1.5 rounded-md border shadow-sm"><Eye size={14}/></button>}
                             </div>
                           </div>
                         </div>
@@ -1143,43 +924,39 @@ function ListadoPrestamos() {
                 <div className="w-full sm:w-2/3">
                   <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                     <label className="flex items-center gap-2 text-sm text-slate-700 font-medium cursor-pointer" onClick={() => toggleFinancingSource('propio')}>
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${financingSources.includes('propio') ? 'bg-[#3173c6] border-[#3173c6]' : 'border-slate-300 bg-white'}`}>
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center ${financingSources.includes('propio') ? 'bg-[#3173c6] border-[#3173c6]' : 'bg-white'}`}>
                          {financingSources.includes('propio') && <Check size={14} className="text-white" />}
-                      </div>
-                      Capital Propio
+                      </div> Capital Propio
                     </label>
                     <label className="flex items-center gap-2 text-sm text-slate-700 font-medium cursor-pointer" onClick={() => toggleFinancingSource('inversionista')}>
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${financingSources.includes('inversionista') ? 'bg-[#3173c6] border-[#3173c6]' : 'border-slate-300 bg-white'}`}>
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center ${financingSources.includes('inversionista') ? 'bg-[#3173c6] border-[#3173c6]' : 'bg-white'}`}>
                          {financingSources.includes('inversionista') && <Check size={14} className="text-white" />}
-                      </div>
-                      Inversionista
+                      </div> Inversionista
                     </label>
                   </div>
 
                   {financingSources.includes('inversionista') && (
-                    <div className="mt-4 flex flex-col animate-in fade-in slide-in-from-top-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Seleccionar Inversionistas:</label>
+                    <div className="mt-4 flex flex-col bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-2">Seleccionar Inversionistas:</label>
                       <div className="relative">
-                        <div className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-700 bg-white min-h-[42px] flex flex-wrap gap-2 cursor-pointer items-center pr-8" onClick={() => setIsInvestorDropdownOpen(!isInvestorDropdownOpen)}>
+                        <div className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white min-h-[42px] flex flex-wrap gap-2 cursor-pointer items-center pr-8" onClick={() => setIsInvestorDropdownOpen(!isInvestorDropdownOpen)}>
                           {selectedInvestors.length === 0 && <span className="text-slate-400">Escoge uno o varios...</span>}
                           {selectedInvestors.map(invId => {
                             const inv = investorsDb.find(i => i.id === invId);
                             return (
                               <span key={invId} className="bg-blue-100/50 border border-blue-200 text-[#3173c6] px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1.5">
-                                {inv ? inv.nombre : invId}
-                                <X size={12} className="cursor-pointer hover:text-blue-800" onClick={(e) => { e.stopPropagation(); toggleInvestor(invId); }}/>
+                                {inv ? inv.nombre : invId} <X size={12} className="cursor-pointer hover:text-blue-800" onClick={(e) => { e.stopPropagation(); toggleInvestor(invId); }}/>
                               </span>
                             )
                           })}
-                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
                         </div>
                         {isInvestorDropdownOpen && (
                           <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                             {investorsDb.length === 0 && <p className="p-3 text-sm text-slate-500 text-center">No hay inversionistas registrados.</p>}
                             {investorsDb.map(inv => (
-                              <label key={inv.id} className="flex items-center gap-3 p-3 text-sm font-medium text-slate-700 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 m-0">
-                                <input type="checkbox" checked={selectedInvestors.includes(inv.id)} onChange={() => toggleInvestor(inv.id)} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4"/>
-                                {inv.nombre}
+                              <label key={inv.id} className="flex items-center gap-3 p-3 text-sm font-medium hover:bg-blue-50 cursor-pointer border-b">
+                                <input type="checkbox" checked={selectedInvestors.includes(inv.id)} onChange={() => toggleInvestor(inv.id)} className="rounded border-slate-300 text-[#3173c6] w-4 h-4"/> {inv.nombre}
                               </label>
                             ))}
                           </div>
@@ -1191,11 +968,11 @@ function ListadoPrestamos() {
                           {selectedInvestors.map(invId => {
                             const inv = investorsDb.find(i => i.id === invId);
                             return (
-                              <div key={invId} className="flex items-center justify-between bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm">
-                                <span className="text-sm text-slate-700 font-semibold">{inv ? inv.nombre : invId}</span>
+                              <div key={invId} className="flex items-center justify-between bg-white border p-2.5 rounded-lg shadow-sm">
+                                <span className="text-sm font-semibold">{inv ? inv.nombre : invId}</span>
                                 <div className="flex items-center gap-1.5 relative">
                                   <span className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-500 font-medium text-sm">S/</span>
-                                  <input type="number" placeholder="0.00" value={investorAmounts[invId] || ''} onChange={(e) => handleAmountChange(invId, e.target.value)} className="w-24 sm:w-28 border border-slate-300 rounded-md p-1.5 pl-7 text-sm text-right font-bold text-slate-800 focus:outline-none focus:border-[#3173c6]" />
+                                  <input type="number" placeholder="0.00" value={investorAmounts[invId] || ''} onChange={(e) => handleAmountChange(invId, e.target.value)} className="w-24 border rounded-md p-1.5 pl-7 text-sm text-right font-bold focus:outline-none focus:border-[#3173c6]" />
                                 </div>
                               </div>
                             )
@@ -1211,32 +988,20 @@ function ListadoPrestamos() {
                 <label className="text-sm font-medium text-slate-700 w-full sm:w-1/3 mb-2 sm:mb-0 sm:mt-1">Doc. Préstamo:</label>
                 <div className="w-full sm:w-2/3 flex flex-col gap-3">
                   <div className="relative">
-                    <select value={documentStatus} onChange={(e) => setDocumentStatus(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-medium text-slate-700 bg-slate-50 focus:bg-white appearance-none focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] transition-all">
-                      <option value="No Firmado">No Firmado</option>
-                      <option value="Firmado">Firmado</option>
+                    <select value={documentStatus} onChange={(e) => setDocumentStatus(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-medium bg-slate-50 appearance-none focus:outline-none focus:border-[#3173c6]">
+                      <option value="No Firmado">No Firmado</option><option value="Firmado">Firmado</option>
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
                   </div>
                   <div className="flex items-center gap-2 w-full">
                     <div className="relative overflow-hidden inline-block flex-1">
-                      <div className={`w-full border border-dashed rounded-lg p-3 text-center text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${documentFile ? 'border-[#3173c6] bg-blue-50 text-[#3173c6]' : 'border-slate-300 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
-                        <FileText size={16} /> 
-                        <span className="truncate max-w-[200px]">
-                          {documentFile ? (typeof documentFile === 'string' ? documentFile : documentFile.name) : 'Adjuntar Contrato/Pagaré'}
-                        </span>
+                      <div className={`w-full border border-dashed rounded-lg p-3 text-center text-sm font-medium flex items-center justify-center gap-2 cursor-pointer ${documentFile ? 'border-[#3173c6] bg-blue-50 text-[#3173c6]' : 'border-slate-300 bg-slate-50 text-slate-500'}`}>
+                        <FileText size={16} /> <span className="truncate max-w-[200px]">{documentFile ? (typeof documentFile === 'string' ? documentFile : documentFile.name) : 'Adjuntar Contrato/Pagaré'}</span>
                       </div>
                       <input type="file" onChange={handleDocumentUpload} className="absolute left-0 top-0 opacity-0 cursor-pointer w-full h-full" />
                     </div>
                     {documentFile && (
-                      <button 
-                        onClick={(e) => { 
-                          e.preventDefault(); 
-                          const dName = typeof documentFile === 'string' ? documentFile : documentFile.name;
-                          const dData = typeof documentFile === 'string' ? null : documentFile.data;
-                          openPreview(dName, dData); 
-                        }} 
-                        className="flex items-center justify-center bg-white text-[#3173c6] hover:bg-blue-50 p-3 rounded-lg border border-slate-300 shadow-sm flex-shrink-0 transition-colors" title="Ver documento"
-                      >
+                      <button onClick={(e) => { e.preventDefault(); openPreview(typeof documentFile === 'string' ? documentFile : documentFile.name, typeof documentFile === 'string' ? null : documentFile.data); }} className="flex items-center justify-center bg-white text-[#3173c6] p-3 rounded-lg border shadow-sm">
                         <Eye size={18} />
                       </button>
                     )}
@@ -1246,40 +1011,38 @@ function ListadoPrestamos() {
 
               <div className="flex flex-col pt-2 pb-4 gap-2">
                 <label className="text-sm font-medium text-slate-700">Comentarios u Observaciones:</label>
-                <textarea rows="3" value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Escribe aquí cualquier detalle adicional..." className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] resize-none text-slate-700 bg-slate-50 focus:bg-white transition-all"></textarea>
+                <textarea rows="3" value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Escribe aquí cualquier detalle..." className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:border-[#3173c6] resize-none bg-slate-50 focus:bg-white"></textarea>
               </div>
 
-              {/* CHECKBOX CONGELADO */}
               <div className="flex flex-col pb-4 gap-2">
-                <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer bg-slate-50 p-3 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer bg-cyan-50/50 p-3 rounded-lg border border-cyan-100 hover:bg-cyan-50 transition-colors">
                   <input type="checkbox" checked={form.congelado || false} onChange={e=>setForm({...form, congelado: e.target.checked})} className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-600 w-5 h-5 cursor-pointer"/>
                   <span className="flex flex-col">
-                    <span>Congelar Préstamo</span>
-                    <span className="font-normal text-xs text-slate-500">Marcar esta opción si hay problemas de cobro. El préstamo no aparecerá como vencido.</span>
+                    <span className="text-cyan-900">Congelar Préstamo</span>
+                    <span className="font-normal text-xs text-cyan-700/70">Marcar esta opción si hay problemas de cobro. El préstamo dejará de aparecer como "Vencido".</span>
                   </span>
                 </label>
               </div>
 
             </div>
 
-            <div className="p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-white sm:bg-slate-50 mt-auto flex-shrink-0">
-              <button onClick={closeModal} className="w-full sm:w-auto px-6 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200 sm:border-transparent">Cancelar</button>
-              <button onClick={handleGuardarPrestamo} disabled={isSaving} className="w-full sm:w-auto px-8 py-2.5 text-sm font-bold text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2">
+            <div className="p-5 border-t flex justify-end gap-3 bg-slate-50 flex-shrink-0">
+              <button onClick={closeModal} className="px-6 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg">Cancelar</button>
+              <button onClick={handleGuardarPrestamo} disabled={isSaving} className="px-8 py-2.5 text-sm font-bold text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm flex items-center gap-2">
                 {isSaving ? <RefreshCcw size={18} className="animate-spin"/> : editingLoanId ? 'Actualizar Préstamo' : 'Crear Préstamo'}
               </button>
             </div>
-
           </div>
         </div>
       )}
 
       {/* Modal Ver Detalles de Préstamo */}
       {isViewLoanModalOpen && selectedLoanView && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-              <h2 className="text-lg font-bold text-slate-800 truncate pr-2">Detalles del Préstamo</h2>
-              <button onClick={() => setIsViewLoanModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors flex-shrink-0"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b bg-slate-50 flex-shrink-0">
+              <h2 className="text-lg font-bold text-slate-800">Detalles del Préstamo</h2>
+              <button onClick={() => setIsViewLoanModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full"><X size={20} /></button>
             </div>
             
             <div className="p-5 sm:p-6 overflow-y-auto flex-1">
@@ -1290,15 +1053,15 @@ function ListadoPrestamos() {
                 </div>
                 <div className="col-span-1">
                   <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Fecha Inicio</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedLoanView.fecha || '-'}</p>
+                  <p className="text-sm font-semibold">{selectedLoanView.fecha || '-'}</p>
                 </div>
                 <div className="col-span-1">
                   <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Próximo Pago</p>
-                  <p className="text-sm font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded w-fit">{selectedLoanView.proximaFechaPago || getFechaUnMesDespues(selectedLoanView.fecha)}</p>
+                  <p className="text-sm font-semibold bg-white border px-2 py-0.5 rounded w-fit">{selectedLoanView.proximaFechaPago || getFechaUnMesDespues(selectedLoanView.fecha)}</p>
                 </div>
                 <div className="col-span-1">
                   <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Monto Original</p>
-                  <p className="text-sm font-semibold text-slate-800">S/ {selectedLoanView.monto}</p>
+                  <p className="text-sm font-semibold">S/ {selectedLoanView.monto}</p>
                 </div>
                 <div className="col-span-1">
                   <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Saldo Actual</p>
@@ -1306,23 +1069,18 @@ function ListadoPrestamos() {
                 </div>
                 <div className="col-span-1">
                   <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Tasa Interés</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedLoanView.tasa}%</p>
+                  <p className="text-sm font-semibold">{selectedLoanView.tasa}%</p>
                 </div>
                 <div className="col-span-1">
                   <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Estado</p>
-                  <span className={`inline-flex items-center gap-1.5 py-0.5 px-2.5 rounded-full text-[10px] font-bold uppercase tracking-wide
-                    ${getEstadoPrestamo(selectedLoanView) === 'Al día' || getEstadoPrestamo(selectedLoanView) === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 
-                      getEstadoPrestamo(selectedLoanView) === 'Vencido' ? 'bg-rose-100 text-rose-800' : 
-                      getEstadoPrestamo(selectedLoanView) === 'Congelado' ? 'bg-cyan-100 text-cyan-800' :
-                      'bg-amber-100 text-amber-800'}`}>
+                  <span className={`inline-flex items-center gap-1.5 py-0.5 px-2.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${getEstadoPrestamo(selectedLoanView) === 'Al día' || getEstadoPrestamo(selectedLoanView) === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : getEstadoPrestamo(selectedLoanView) === 'Vencido' ? 'bg-rose-100 text-rose-800' : getEstadoPrestamo(selectedLoanView) === 'Congelado' ? 'bg-cyan-100 text-cyan-800' : 'bg-amber-100 text-amber-800'}`}>
                     {getEstadoPrestamo(selectedLoanView)}
                   </span>
                 </div>
 
-                {/* Mostrar Inversionistas si existen */}
                 {selectedLoanView.financingSources?.includes('inversionista') && selectedLoanView.selectedInvestors?.length > 0 && (
                   <div className="col-span-2 md:col-span-4 mt-2 bg-blue-50/80 p-3.5 rounded-lg border border-blue-200">
-                    <p className="text-[10px] text-blue-800 mb-2 uppercase tracking-wider font-bold flex items-center gap-1"><Users size={12}/> Inversionistas Vinculados</p>
+                    <p className="text-[10px] text-blue-800 mb-2 uppercase font-bold flex items-center gap-1"><Users size={12}/> Inversionistas Vinculados</p>
                     <div className="flex flex-wrap gap-2">
                       {selectedLoanView.selectedInvestors.map(invId => {
                         const inv = investorsDb.find(i => i.id === invId);
@@ -1338,11 +1096,7 @@ function ListadoPrestamos() {
                 )}
               </div>
 
-              {/* Cálculos de Rentabilidad */}
-              <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2 border-b border-slate-200 pb-2">
-                <TrendingUp size={16} className="text-emerald-600" /> Rentabilidad del Préstamo
-              </h3>
-              
+              <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2 border-b pb-2"><TrendingUp size={16} className="text-emerald-600" /> Rentabilidad del Préstamo</h3>
               {(() => {
                 const desglose = getDesgloseGanancias(selectedLoanView);
                 return (
@@ -1352,7 +1106,6 @@ function ListadoPrestamos() {
                         <span className="text-sm font-medium text-emerald-700">Interés Mensual a Cobrar (Bruto):</span>
                         <span className="font-bold text-emerald-800">S/ {desglose.interesBruto.toFixed(2)}</span>
                       </div>
-                      
                       {desglose.gananciaInversionistas > 0 && (
                         <div className="flex justify-between items-center pb-3 border-b border-emerald-100/60">
                           <div className="flex flex-col">
@@ -1362,7 +1115,6 @@ function ListadoPrestamos() {
                           <span className="font-bold text-rose-600">- S/ {desglose.gananciaInversionistas.toFixed(2)}</span>
                         </div>
                       )}
-                      
                       <div className="flex justify-between items-center bg-emerald-100/50 p-3 rounded-lg">
                         <span className="font-bold text-emerald-900 uppercase tracking-wide text-sm">Tu Ganancia Real (Neta):</span>
                         <span className="text-xl font-black text-emerald-700">S/ {desglose.miGananciaReal.toFixed(2)}</span>
@@ -1372,29 +1124,19 @@ function ListadoPrestamos() {
                 );
               })()}
 
-              {/* Información Adicional */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {selectedLoanView.selectedBanks?.length > 0 && (
-                  <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-                    <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-bold">Bancos Asignados</p>
+                  <div className="bg-white border rounded-lg p-4 shadow-sm">
+                    <p className="text-[10px] text-slate-500 mb-2 uppercase font-bold">Bancos Asignados</p>
                     <div className="flex flex-wrap gap-2">
-                      {selectedLoanView.selectedBanks.map(b => (
-                        <span key={b} className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-medium border border-slate-200">{b}</span>
-                      ))}
+                      {selectedLoanView.selectedBanks.map(b => <span key={b} className="bg-slate-100 text-xs px-2 py-1 rounded font-medium border">{b}</span>)}
                     </div>
                   </div>
                 )}
-
                 {selectedLoanView.documentFile && (
-                  <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm flex flex-col justify-center">
-                    <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-bold">Documento Adjunto</p>
-                    <button 
-                      onClick={() => openPreview(
-                        typeof selectedLoanView.documentFile === 'string' ? selectedLoanView.documentFile : selectedLoanView.documentFile.name, 
-                        typeof selectedLoanView.documentFile === 'string' ? null : selectedLoanView.documentFile.data
-                      )}
-                      className="flex items-center gap-2 text-sm font-bold text-[#3173c6] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-2 rounded-lg transition-colors w-fit"
-                    >
+                  <div className="bg-white border rounded-lg p-4 shadow-sm flex flex-col justify-center">
+                    <p className="text-[10px] text-slate-500 mb-2 uppercase font-bold">Documento Adjunto</p>
+                    <button onClick={() => openPreview(typeof selectedLoanView.documentFile === 'string' ? selectedLoanView.documentFile : selectedLoanView.documentFile.name, typeof selectedLoanView.documentFile === 'string' ? null : selectedLoanView.documentFile.data)} className="flex items-center gap-2 text-sm font-bold text-[#3173c6] bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg w-fit">
                       <Eye size={16} /> Ver Documento / Pagaré
                     </button>
                   </div>
@@ -1403,14 +1145,13 @@ function ListadoPrestamos() {
               
               {selectedLoanView.comments && (
                 <div className="mt-4 bg-yellow-50 border border-yellow-100 p-4 rounded-lg shadow-sm">
-                  <p className="text-[10px] text-yellow-700 mb-1 uppercase tracking-wider font-bold">Comentarios / Observaciones</p>
+                  <p className="text-[10px] text-yellow-700 mb-1 uppercase font-bold">Comentarios / Observaciones</p>
                   <p className="text-sm text-yellow-900">{selectedLoanView.comments}</p>
                 </div>
               )}
             </div>
-            
-            <div className="p-5 border-t border-slate-200 flex justify-end bg-white sm:bg-slate-50 flex-shrink-0">
-              <button onClick={() => setIsViewLoanModalOpen(false)} className="w-full sm:w-auto px-8 py-2.5 text-sm font-medium text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm transition-colors">Cerrar Detalles</button>
+            <div className="p-5 border-t flex justify-end bg-slate-50 flex-shrink-0">
+              <button onClick={() => setIsViewLoanModalOpen(false)} className="px-8 py-2.5 text-sm font-bold text-white bg-[#3173c6] rounded-lg shadow-sm">Cerrar Detalles</button>
             </div>
           </div>
         </div>
@@ -1421,28 +1162,19 @@ function ListadoPrestamos() {
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[70] flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col h-[90vh] sm:h-[85vh] animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-              <h3 className="font-bold text-slate-800 truncate pr-4 flex items-center gap-2 text-sm sm:text-base">
-                <Eye size={18} className="text-[#3173c6] flex-shrink-0" /> <span className="truncate">{previewModal.name}</span>
-              </h3>
-              <button onClick={() => setPreviewModal({isOpen: false, name: '', data: null})} className="text-slate-500 hover:text-slate-800 bg-slate-200/50 hover:bg-slate-200 p-1.5 rounded-full transition-colors flex-shrink-0"><X size={20}/></button>
+              <h3 className="font-bold text-slate-800 truncate pr-4 flex items-center gap-2 text-sm sm:text-base"><Eye size={18} className="text-[#3173c6] flex-shrink-0" /> <span className="truncate">{previewModal.name}</span></h3>
+              <button onClick={() => setPreviewModal({isOpen: false, name: '', data: null})} className="p-1.5 hover:bg-slate-200 rounded-full"><X size={20}/></button>
             </div>
             <div className="flex-1 bg-slate-100 flex items-center justify-center p-2 sm:p-4 overflow-hidden relative">
               {previewModal.data ? (
-                previewModal.data.startsWith('data:image/') ? (
-                  <img src={previewModal.data} alt="Vista Previa" className="max-w-full max-h-full object-contain shadow-lg rounded bg-white" />
-                ) : previewModal.data.startsWith('data:application/pdf') ? (
-                  <iframe src={previewModal.data} className="w-full h-full rounded shadow-lg border-0 bg-white" title="PDF Preview" />
-                ) : (
-                  <div className="text-center text-slate-500 flex flex-col items-center p-8">
-                    <FileText size={48} className="mb-3 opacity-50 text-slate-400" />
-                    <p className="font-medium text-lg">Vista previa no disponible</p>
-                  </div>
-                )
+                previewModal.data.startsWith('data:image/') ? <img src={previewModal.data} alt="Vista Previa" className="max-w-full max-h-full object-contain shadow-lg rounded bg-white" />
+                : previewModal.data.startsWith('data:application/pdf') ? <iframe src={previewModal.data} className="w-full h-full rounded shadow-lg border-0 bg-white" title="PDF Preview" />
+                : <div className="text-center p-8"><FileText size={48} className="mb-3 opacity-50" /><p>Vista previa no disponible</p></div>
               ) : (
-                <div className="text-center text-slate-500 flex flex-col items-center bg-white p-6 sm:p-10 rounded-xl shadow-sm border border-slate-200 mx-4">
-                  <Cloud size={64} className="mb-4 text-[#3173c6] opacity-80" />
-                  <p className="text-lg sm:text-xl font-bold text-slate-700">Archivo antiguo o sin datos</p>
-                  <p className="text-sm mt-3 text-slate-500 max-w-md leading-relaxed">Para visualizar este archivo, necesitas volver a subirlo o implementar Firebase Cloud Storage.</p>
+                <div className="text-center bg-white p-6 rounded-xl shadow-sm border mx-4">
+                  <Cloud size={64} className="mb-4 text-[#3173c6] mx-auto opacity-80" />
+                  <p className="text-lg font-bold">Archivo antiguo o sin datos</p>
+                  <p className="text-sm mt-3 text-slate-500">Para visualizar este archivo, necesitas volver a subirlo o implementar Firebase Cloud Storage.</p>
                 </div>
               )}
             </div>
@@ -1459,67 +1191,46 @@ function ListadoInversionistas() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedInvestor, setSelectedInvestor] = useState(null);
   const [editingInvestorId, setEditingInvestorId] = useState(null);
-  
   const [investors, setInvestors] = useState([]);
   const [prestamos, setPrestamos] = useState([]);
-  
-  // States para Pagos a Inversionistas
   const [pagosInversionistas, setPagosInversionistas] = useState([]);
   const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
   const [isEditPagoModalOpen, setIsEditPagoModalOpen] = useState(false);
   const [isViewPagoModalOpen, setIsViewPagoModalOpen] = useState(false);
   const [selectedPagoModal, setSelectedPagoModal] = useState(null);
   const [pagoSearchTerm, setPagoSearchTerm] = useState('');
-  
   const [isSaving, setIsSaving] = useState(false);
   
   const [form, setForm] = useState({ nombre: '', dni: '', telefono: '', fecha: '', direccion: '', monto: '', tasa: '', banco: '' });
-  
-  const [pagoForm, setPagoForm] = useState({
-    fecha: '', inversionistaId: '', monto: '', concepto: 'Interés'
-  });
-  const [editPagoForm, setEditPagoForm] = useState({
-    id: '', inversionistaNombre: '', fecha: '', monto: '', concepto: ''
-  });
+  const [pagoForm, setPagoForm] = useState({ fecha: '', inversionistaId: '', monto: '', concepto: 'Interés' });
+  const [editPagoForm, setEditPagoForm] = useState({ id: '', inversionistaNombre: '', fecha: '', monto: '', concepto: '' });
   const [pagoDocumentoFile, setPagoDocumentoFile] = useState(null);
-
   const [previewModal, setPreviewModal] = useState({ isOpen: false, name: '', data: null });
 
   useEffect(() => {
     const invRef = getCollectionRef(user, 'inversionistas');
     const presRef = getCollectionRef(user, 'prestamos');
     const pagInvRef = getCollectionRef(user, 'pagos_inversionistas');
-    
     if(!invRef || !presRef || !pagInvRef) return;
-
     const unsubI = onSnapshot(invRef, (snap) => setInvestors(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubP = onSnapshot(presRef, (snap) => setPrestamos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubPagInv = onSnapshot(pagInvRef, (snap) => setPagosInversionistas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    
     return () => { unsubI(); unsubP(); unsubPagInv(); };
   }, [user]);
 
-  const openPreview = (name, data) => {
-    setPreviewModal({ isOpen: true, name, data });
-  };
+  const openPreview = (name, data) => setPreviewModal({ isOpen: true, name, data });
 
   const handleGuardarInv = async () => {
     if (!form.nombre) return alert('El nombre es obligatorio');
     setIsSaving(true);
     try {
       if (editingInvestorId) {
-        const docRef = getDocRef(user, 'inversionistas', editingInvestorId);
-        await updateDoc(docRef, { ...form });
+        await updateDoc(getDocRef(user, 'inversionistas', editingInvestorId), { ...form });
       } else {
-        const invRef = getCollectionRef(user, 'inversionistas');
-        await addDoc(invRef, { ...form, createdAt: serverTimestamp() });
+        await addDoc(getCollectionRef(user, 'inversionistas'), { ...form, createdAt: serverTimestamp() });
       }
       closeModal();
-    } catch(e) { 
-      console.error(e); 
-    } finally { 
-      setIsSaving(false); 
-    }
+    } catch(e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const handlePagoDocumentoUpload = (e) => { 
@@ -1527,105 +1238,43 @@ function ListadoInversionistas() {
     if (!file) return;
     if (file.size > 800000) return alert('El archivo es demasiado grande (máx 800KB).'); 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPagoDocumentoFile({ name: file.name, data: reader.result }); 
-    };
+    reader.onloadend = () => setPagoDocumentoFile({ name: file.name, data: reader.result });
     reader.readAsDataURL(file);
   };
 
   const handleRegistrarPagoInv = async () => {
-    if(!pagoForm.inversionistaId || !pagoForm.monto || !pagoForm.fecha) return alert("Seleccione un inversionista, digite la fecha y el monto.");
+    if(!pagoForm.inversionistaId || !pagoForm.monto || !pagoForm.fecha) return alert("Seleccione un inversionista, fecha y monto.");
     setIsSaving(true);
     try {
       const inv = investors.find(i => i.id === pagoForm.inversionistaId);
-      const pagInvRef = getCollectionRef(user, 'pagos_inversionistas');
-
-      await addDoc(pagInvRef, {
-        inversionistaId: inv.id,
-        inversionistaNombre: inv.nombre,
-        fecha: pagoForm.fecha,
-        monto: pagoForm.monto,
-        concepto: pagoForm.concepto,
-        documento: pagoDocumentoFile,
-        createdAt: serverTimestamp()
+      await addDoc(getCollectionRef(user, 'pagos_inversionistas'), {
+        inversionistaId: inv.id, inversionistaNombre: inv.nombre, fecha: pagoForm.fecha, monto: pagoForm.monto, concepto: pagoForm.concepto, documento: pagoDocumentoFile, createdAt: serverTimestamp()
       });
-
       if (pagoForm.concepto === 'Devolución') {
         const nuevoMonto = Math.max(0, parseFloat(inv.monto || 0) - parseFloat(pagoForm.monto));
-        const invRef = getDocRef(user, 'inversionistas', inv.id);
-        await updateDoc(invRef, { monto: nuevoMonto.toString() });
+        await updateDoc(getDocRef(user, 'inversionistas', inv.id), { monto: nuevoMonto.toString() });
       }
-
-      alert("Pago a inversionista registrado correctamente");
+      alert("Pago registrado correctamente");
       closePagoModal();
-    } catch(e) {
-      console.error(e);
-      alert("Error al registrar el pago.");
-    } finally {
-      setIsSaving(false);
-    }
+    } catch(e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const handleGuardarEditPagoInv = async () => {
     if(!editPagoForm.monto) return alert("El monto es obligatorio");
     setIsSaving(true);
     try {
-      const docRef = getDocRef(user, 'pagos_inversionistas', editPagoForm.id);
-      await updateDoc(docRef, {
-        fecha: editPagoForm.fecha,
-        monto: editPagoForm.monto,
-        concepto: editPagoForm.concepto
-      });
+      await updateDoc(getDocRef(user, 'pagos_inversionistas', editPagoForm.id), { fecha: editPagoForm.fecha, monto: editPagoForm.monto, concepto: editPagoForm.concepto });
       setIsEditPagoModalOpen(false);
-    } catch (e) {
-      console.error("Error al actualizar pago:", e);
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingInvestorId(null);
-    setForm({ nombre: '', dni: '', telefono: '', fecha: '', direccion: '', monto: '', tasa: '', banco: '' });
-  };
+  const closeModal = () => { setIsModalOpen(false); setEditingInvestorId(null); setForm({ nombre: '', dni: '', telefono: '', fecha: '', direccion: '', monto: '', tasa: '', banco: '' }); };
+  const closePagoModal = () => { setIsPagoModalOpen(false); setPagoForm({ fecha: '', inversionistaId: '', monto: '', concepto: 'Interés' }); setPagoDocumentoFile(null); };
+  const openNewInvestor = () => { setForm({ nombre: '', dni: '', telefono: '', fecha: '', direccion: '', monto: '', tasa: '', banco: '' }); setEditingInvestorId(null); setIsModalOpen(true); };
+  const openEditInvestor = (investor) => { setForm({ ...investor }); setEditingInvestorId(investor.id); setIsModalOpen(true); };
+  const openEditPago = (pago) => { setEditPagoForm({ id: pago.id, inversionistaNombre: pago.inversionistaNombre || '', fecha: pago.fecha || '', monto: pago.monto || '', concepto: pago.concepto || '' }); setIsEditPagoModalOpen(true); };
 
-  const closePagoModal = () => {
-    setIsPagoModalOpen(false);
-    setPagoForm({ fecha: '', inversionistaId: '', monto: '', concepto: 'Interés' });
-    setPagoDocumentoFile(null);
-  };
-
-  const openNewInvestor = () => {
-    setForm({ nombre: '', dni: '', telefono: '', fecha: '', direccion: '', monto: '', tasa: '', banco: '' });
-    setEditingInvestorId(null);
-    setIsModalOpen(true);
-  };
-
-  const openEditInvestor = (investor) => {
-    setForm({
-      nombre: investor.nombre || '', dni: investor.dni || '', telefono: investor.telefono || '', 
-      fecha: investor.fecha || '', direccion: investor.direccion || '', monto: investor.monto || '', 
-      tasa: investor.tasa || '', banco: investor.banco || ''
-    });
-    setEditingInvestorId(investor.id);
-    setIsModalOpen(true);
-  };
-
-  const openEditPago = (pago) => {
-    setEditPagoForm({
-      id: pago.id,
-      inversionistaNombre: pago.inversionistaNombre || '',
-      fecha: pago.fecha || '',
-      monto: pago.monto || '',
-      concepto: pago.concepto || ''
-    });
-    setIsEditPagoModalOpen(true);
-  };
-
-  const filteredPagosInv = pagosInversionistas
-    .filter(p => p.inversionistaNombre && p.inversionistaNombre.toLowerCase().includes(pagoSearchTerm.toLowerCase()))
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const filteredPagosInv = pagosInversionistas.filter(p => p.inversionistaNombre && p.inversionistaNombre.toLowerCase().includes(pagoSearchTerm.toLowerCase())).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   return (
     <div className="w-full">
@@ -1658,451 +1307,447 @@ function ListadoInversionistas() {
                   <td className="py-3 px-4 sm:px-6 text-slate-800 font-semibold">S/ {investor.monto || '0.00'}</td>
                   <td className="py-3 px-4 sm:px-6 text-right">
                     <div className="flex gap-2 justify-end">
-                      <button onClick={() => openEditInvestor(investor)} className="bg-white text-slate-600 border border-slate-300 text-xs px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">
-                        Editar
-                      </button>
-                      <button onClick={() => { setSelectedInvestor(investor); setIsDetailsModalOpen(true); }} className="bg-[#3173c6] text-white text-xs px-3 py-1.5 rounded hover:bg-[#2860a8] shadow-sm transition-colors">
-                        Detalles
-                      </button>
+                      <button onClick={() => openEditInvestor(investor)} className="bg-white border border-slate-300 text-xs px-3 py-1.5 rounded hover:bg-slate-50">Editar</button>
+                      <button onClick={() => { setSelectedInvestor(investor); setIsDetailsModalOpen(true); }} className="bg-[#3173c6] text-white text-xs px-3 py-1.5 rounded hover:bg-[#2860a8]">Detalles</button>
                     </div>
                   </td>
                 </tr>
-              )) : (
-                <tr><td colSpan="3" className="py-10 text-center text-slate-500">No hay inversionistas registrados.</td></tr>
-              )}
+              )) : <tr><td colSpan="3" className="py-10 text-center text-slate-500">No hay inversionistas registrados.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* SECCIÓN: Historial de Pagos a Inversionistas */}
       <div className="w-full border-t border-slate-200 pt-8">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
           <h2 className="text-xl font-bold text-slate-700">Historial de Pagos Realizados</h2>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              value={pagoSearchTerm}
-              onChange={(e) => setPagoSearchTerm(e.target.value)}
-              placeholder="Buscar por inversionista..." 
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-400 shadow-sm text-slate-700 bg-white"
-            />
+            <input type="text" value={pagoSearchTerm} onChange={(e) => setPagoSearchTerm(e.target.value)} placeholder="Buscar por inversionista..." className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm outline-none focus:border-blue-400 shadow-sm" />
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-              <thead>
-                <tr className="bg-[#f0f3f7] text-slate-600 font-semibold border-b border-slate-200 text-xs uppercase tracking-wider">
-                  <th className="py-3 px-4 sm:px-6">Fecha</th>
-                  <th className="py-3 px-4 sm:px-6">Inversionista</th>
-                  <th className="py-3 px-4 sm:px-6">Concepto</th>
-                  <th className="py-3 px-4 sm:px-6">Monto</th>
-                  <th className="py-3 px-4 sm:px-6 text-right">Acciones</th>
-                </tr>
+              <thead className="bg-[#f0f3f7] text-slate-600 font-semibold border-b text-xs uppercase tracking-wider">
+                <tr><th className="py-3 px-4 sm:px-6">Fecha</th><th className="py-3 px-4 sm:px-6">Inversionista</th><th className="py-3 px-4 sm:px-6">Concepto</th><th className="py-3 px-4 sm:px-6">Monto</th><th className="py-3 px-4 sm:px-6 text-right">Acciones</th></tr>
               </thead>
               <tbody>
-                {filteredPagosInv.length > 0 ? (
-                  filteredPagosInv.map((pago) => (
-                    <tr key={pago.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 sm:px-6 text-slate-600">{pago.fecha || '-'}</td>
-                      <td className="py-3.5 px-4 sm:px-6 text-slate-800 font-bold">{pago.inversionistaNombre}</td>
-                      <td className="py-3.5 px-4 sm:px-6 text-slate-600">
-                        <span className={`px-2 py-1 rounded text-[11px] font-bold border ${pago.concepto === 'Devolución' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                          {pago.concepto}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 sm:px-6 font-black text-[#3173c6]">S/ {pago.monto}</td>
-                      <td className="py-3.5 px-4 sm:px-6 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => openEditPago(pago)} className="bg-white border border-slate-300 text-slate-600 text-xs px-3 py-1.5 rounded hover:bg-slate-100 transition-colors">
-                            Editar
-                          </button>
-                          <button onClick={() => { setSelectedPagoModal(pago); setIsViewPagoModalOpen(true); }} className="bg-slate-800 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-700 shadow-sm transition-colors">
-                            Ver
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5" className="py-12 text-center text-slate-500">
-                      No se encontraron pagos a inversionistas registrados.
+                {filteredPagosInv.length > 0 ? filteredPagosInv.map((pago) => (
+                  <tr key={pago.id} className="border-b hover:bg-slate-50">
+                    <td className="py-3.5 px-4 sm:px-6 text-slate-600">{pago.fecha || '-'}</td>
+                    <td className="py-3.5 px-4 sm:px-6 font-bold">{pago.inversionistaNombre}</td>
+                    <td className="py-3.5 px-4 sm:px-6"><span className={`px-2 py-1 rounded text-[11px] font-bold border ${pago.concepto === 'Devolución' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-100 text-slate-600'}`}>{pago.concepto}</span></td>
+                    <td className="py-3.5 px-4 sm:px-6 font-black text-[#3173c6]">S/ {pago.monto}</td>
+                    <td className="py-3.5 px-4 sm:px-6 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => openEditPago(pago)} className="bg-white border text-xs px-3 py-1.5 rounded hover:bg-slate-100">Editar</button>
+                        <button onClick={() => { setSelectedPagoModal(pago); setIsViewPagoModalOpen(true); }} className="bg-slate-800 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-700">Ver</button>
+                      </div>
                     </td>
                   </tr>
-                )}
+                )) : <tr><td colSpan="5" className="py-12 text-center text-slate-500">No hay pagos a inversionistas registrados.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {/* Modal Nuevo/Editar Inversionista */}
+      {/* Modals para Inversionistas */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800">{editingInvestorId ? 'Editar Inversionista' : 'Registrar Inversionista'}</h2>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b bg-slate-50">
+              <h2 className="text-lg font-bold">{editingInvestorId ? 'Editar Inversionista' : 'Registrar Inversionista'}</h2>
+              <button onClick={closeModal} className="p-1.5 hover:bg-slate-200 rounded-full"><X size={20} /></button>
             </div>
-            <div className="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nombre Completo</label>
-                <input type="text" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow" placeholder="Ej. Pedro Diaz" />
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
+              <div><label className="block text-sm font-medium mb-1">Nombre Completo</label><input type="text" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} className="w-full border rounded-lg p-2.5 text-sm" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-sm font-medium mb-1">DNI</label><input type="text" value={form.dni} onChange={e=>setForm({...form, dni: e.target.value})} className="w-full border rounded-lg p-2.5 text-sm" /></div>
+                <div><label className="block text-sm font-medium mb-1">Teléfono</label><input type="tel" value={form.telefono} onChange={e=>setForm({...form, telefono: e.target.value})} className="w-full border rounded-lg p-2.5 text-sm" /></div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">DNI</label>
-                  <input type="text" value={form.dni} onChange={e=>setForm({...form, dni: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow" placeholder="Ej. 12345678" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Teléfono</label>
-                  <input type="tel" value={form.telefono} onChange={e=>setForm({...form, telefono: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow" placeholder="Ej. 987 654 321" />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="col-span-2"><label className="block text-sm font-medium mb-1">Dirección</label><input type="text" value={form.direccion} onChange={e=>setForm({...form, direccion: e.target.value})} className="w-full border rounded-lg p-2.5 text-sm" /></div>
+                 <div><label className="block text-sm font-medium mb-1">Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form, fecha: e.target.value})} className="w-full border rounded-lg p-2.5 text-sm" /></div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Dirección</label>
-                    <input type="text" value={form.direccion} onChange={e=>setForm({...form, direccion: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow" placeholder="Ej. Av. Principal 123" />
-                 </div>
-                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Fecha de Inversión</label>
-                  <input type="date" value={form.fecha} onChange={e=>setForm({...form, fecha: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow" />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Monto de Inversión (S/)</label>
-                  <input type="number" value={form.monto} onChange={e=>setForm({...form, monto: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow font-bold" placeholder="Ej. 10000" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Tasa Rendimiento (%)</label>
-                  <input type="number" value={form.tasa} onChange={e=>setForm({...form, tasa: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow font-bold" placeholder="Ej. 12" />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-sm font-medium mb-1">Monto Inversión (S/)</label><input type="number" value={form.monto} onChange={e=>setForm({...form, monto: e.target.value})} className="w-full border rounded-lg p-2.5 text-sm font-bold" /></div>
+                <div><label className="block text-sm font-medium mb-1">Tasa %</label><input type="number" value={form.tasa} onChange={e=>setForm({...form, tasa: e.target.value})} className="w-full border rounded-lg p-2.5 text-sm font-bold" /></div>
               </div>
             </div>
-            <div className="p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-white sm:bg-slate-50">
-              <button onClick={closeModal} className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 border border-slate-200 sm:border-transparent rounded-lg transition-colors">Cancelar</button>
-              <button onClick={handleGuardarInv} disabled={isSaving} className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm flex justify-center gap-2 items-center transition-colors">
-                {isSaving ? <RefreshCcw size={16} className="animate-spin"/> : editingInvestorId ? 'Actualizar Inversor' : 'Guardar Inversor'}
-              </button>
+            <div className="p-5 border-t flex justify-end gap-3 bg-slate-50">
+              <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-200">Cancelar</button>
+              <button onClick={handleGuardarInv} disabled={isSaving} className="px-6 py-2.5 text-sm font-bold text-white bg-[#3173c6] rounded-lg">Guardar Inversor</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Detalles del Inversionista */}
-      {isDetailsModalOpen && selectedInvestor && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-              <h2 className="text-lg font-bold text-slate-800 truncate pr-2">Detalles - {selectedInvestor.nombre}</h2>
-              <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors flex-shrink-0"><X size={20} /></button>
-            </div>
-            
-            <div className="p-5 sm:p-6 overflow-y-auto flex-1">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-4 mb-8 bg-blue-50/50 p-5 rounded-xl border border-blue-100 shadow-sm">
-                <div className="col-span-1">
-                  <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">DNI</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedInvestor.dni || '-'}</p>
-                </div>
-                <div className="col-span-1">
-                  <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Teléfono</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedInvestor.telefono || '-'}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Dirección</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedInvestor.direccion || '-'}</p>
-                </div>
-                <div className="col-span-2 border-t border-blue-100/50 pt-4">
-                  <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Monto Invertido</p>
-                  <p className="text-xl font-bold text-[#3173c6]">S/ {selectedInvestor.monto || '0.00'}</p>
-                </div>
-                <div className="col-span-2 border-t border-blue-100/50 pt-4">
-                  <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider font-bold">Tasa de Rendimiento</p>
-                  <p className="text-xl font-bold text-emerald-600">{selectedInvestor.tasa || '0'}%</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2 flex items-center gap-2">
-                  <Users size={16} className="text-[#3173c6]" />
-                  Préstamos Asignados
-                </h3>
-                
-                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                  <div className="overflow-x-auto w-full">
-                    <table className="w-full text-left text-sm border-collapse whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-xs uppercase tracking-wider">
-                          <th className="py-3 px-4">Cliente</th>
-                          <th className="py-3 px-4">Monto Original</th>
-                          <th className="py-3 px-4">Próx. Pago</th>
-                          <th className="py-3 px-4 text-center">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const investorLoans = prestamos.filter(p => p.selectedInvestors && p.selectedInvestors.includes(selectedInvestor.id));
-                          if (investorLoans.length === 0) return <tr><td colSpan="4" className="p-6 text-center text-slate-500">No hay préstamos asignados a este inversionista.</td></tr>;
-                          return investorLoans.map((loan) => {
-                            const estado = getEstadoPrestamo(loan);
-                            return (
-                              <tr key={loan.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
-                                <td className="py-3.5 px-4 text-slate-800 font-medium">{loan.clienteNombre}</td>
-                                <td className="py-3.5 px-4 text-slate-700 font-semibold">S/ {loan.monto}</td>
-                                <td className="py-3.5 px-4 text-slate-500">{loan.proximaFechaPago || getFechaUnMesDespues(loan.fecha)}</td>
-                                <td className="py-3.5 px-4 text-center">
-                                  <span className={`inline-flex items-center gap-1.5 py-0.5 px-2.5 rounded-full text-[10px] font-bold uppercase tracking-wide
-                                    ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 
-                                      estado === 'Vencido' ? 'bg-rose-100 text-rose-800' : 
-                                      estado === 'Congelado' ? 'bg-cyan-100 text-cyan-800' :
-                                      'bg-amber-100 text-amber-800'}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full 
-                                      ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-600' : 
-                                        estado === 'Vencido' ? 'bg-rose-600' : 
-                                        estado === 'Congelado' ? 'bg-cyan-600' :
-                                        'bg-amber-600'}`}></span>
-                                    {estado}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-5 border-t border-slate-200 flex justify-end bg-white sm:bg-slate-50 flex-shrink-0">
-              <button onClick={() => setIsDetailsModalOpen(false)} className="w-full sm:w-auto px-8 py-2.5 text-sm font-medium text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm transition-colors">Cerrar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Nuevo Pago a Inversionista */}
       {isPagoModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800">Registrar Salida de Dinero</h2>
-              <button onClick={closePagoModal} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
-            </div>
-            <div className="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              
-              <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 mb-4">
-                <p className="text-xs text-slate-600 mb-2">Seleccione a qué inversionista se le está realizando el pago.</p>
-                <div className="relative">
-                  <select value={pagoForm.inversionistaId} onChange={e=>setPagoForm({...pagoForm, inversionistaId: e.target.value})} className="w-full border border-blue-200 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] appearance-none bg-white font-semibold text-[#3173c6]">
-                    <option value="">Seleccione un Inversionista...</option>
-                    {investors.map(inv => (
-                      <option key={inv.id} value={inv.id}>{inv.nombre} (Capital: S/ {inv.monto})</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-400 pointer-events-none" size={16} />
-                </div>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b bg-slate-50"><h2 className="text-lg font-bold">Registrar Salida de Dinero</h2><button onClick={closePagoModal}><X/></button></div>
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <label className="text-xs font-bold mb-2 block">Seleccione inversionista:</label>
+                <select value={pagoForm.inversionistaId} onChange={e=>setPagoForm({...pagoForm, inversionistaId: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white">
+                  <option value="">Seleccione...</option>{investors.map(inv => <option key={inv.id} value={inv.id}>{inv.nombre} (Cap: S/{inv.monto})</option>)}
+                </select>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Fecha del Pago</label>
-                  <input type="date" value={pagoForm.fecha} onChange={e=>setPagoForm({...pagoForm, fecha: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Monto Entregado (S/)</label>
-                  <input type="number" value={pagoForm.monto} onChange={e=>setPagoForm({...pagoForm, monto: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-shadow font-bold" placeholder="Ej. 500" />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-sm font-bold mb-1">Fecha</label><input type="date" value={pagoForm.fecha} onChange={e=>setPagoForm({...pagoForm, fecha: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm" /></div>
+                <div><label className="block text-sm font-bold mb-1">Monto (S/)</label><input type="number" value={pagoForm.monto} onChange={e=>setPagoForm({...pagoForm, monto: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm font-bold" /></div>
               </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Concepto</label>
-                    <div className="relative">
-                      <select value={pagoForm.concepto} onChange={e=>setPagoForm({...pagoForm, concepto: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] appearance-none bg-slate-50 focus:bg-white font-medium">
-                        <option value="Interés">Pago de Interés (Ganancia)</option>
-                        <option value="Devolución">Devolución de Capital</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                    </div>
-                    {pagoForm.concepto === 'Devolución' && (
-                      <p className="mt-2 text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-100 font-medium">
-                        ⚠️ Este monto se restará del "Capital Invertido" actual de este inversionista.
-                      </p>
-                    )}
-                 </div>
-              </div>
-              
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Documento / Voucher</label>
+                 <label className="block text-sm font-bold mb-1">Concepto</label>
+                 <select value={pagoForm.concepto} onChange={e=>setPagoForm({...pagoForm, concepto: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white">
+                   <option value="Interés">Pago de Interés (Ganancia)</option><option value="Devolución">Devolución de Capital</option>
+                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-1">Voucher</label>
                 <div className="flex items-center gap-2 w-full">
-                  <div className="relative overflow-hidden inline-block flex-1">
-                    <div className={`w-full border border-dashed rounded-lg p-3 text-center text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${pagoDocumentoFile ? 'border-[#3173c6] bg-blue-50 text-[#3173c6]' : 'border-slate-300 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
-                      <Upload size={16} /> 
-                      <span className="truncate max-w-[200px]">
-                        {pagoDocumentoFile ? pagoDocumentoFile.name : 'Subir archivo del pago'}
-                      </span>
-                    </div>
-                    <input type="file" onChange={handlePagoDocumentoUpload} className="absolute left-0 top-0 opacity-0 cursor-pointer w-full h-full" />
+                  <div className="relative overflow-hidden flex-1">
+                    <div className="w-full border border-dashed rounded-lg p-3 text-center text-sm flex items-center justify-center gap-2 cursor-pointer bg-slate-50"><Upload size={16} /> <span className="truncate">{pagoDocumentoFile ? pagoDocumentoFile.name : 'Subir archivo'}</span></div>
+                    <input type="file" onChange={handlePagoDocumentoUpload} className="absolute left-0 top-0 opacity-0 w-full h-full cursor-pointer" />
                   </div>
-                  {pagoDocumentoFile && (
-                    <button 
-                      onClick={(e) => { 
-                        e.preventDefault(); 
-                        openPreview(pagoDocumentoFile.name, pagoDocumentoFile.data); 
-                      }} 
-                      className="flex items-center justify-center bg-white text-[#3173c6] hover:bg-blue-50 p-3 rounded-lg border border-slate-300 shadow-sm flex-shrink-0 transition-colors" title="Ver documento"
-                    >
-                      <Eye size={18} />
-                    </button>
-                  )}
+                  {pagoDocumentoFile && <button onClick={(e)=>{e.preventDefault(); openPreview(pagoDocumentoFile.name, pagoDocumentoFile.data)}} className="p-3 bg-white border rounded-lg text-[#3173c6]"><Eye size={18}/></button>}
                 </div>
               </div>
-
             </div>
-            <div className="p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-white sm:bg-slate-50">
-              <button onClick={closePagoModal} className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 border border-slate-200 sm:border-transparent rounded-lg transition-colors">Cancelar</button>
-              <button onClick={handleRegistrarPagoInv} disabled={isSaving} className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm flex justify-center gap-2 items-center transition-colors">
-                {isSaving ? <RefreshCcw size={16} className="animate-spin"/> : 'Procesar Salida'}
-              </button>
+            <div className="p-5 border-t flex justify-end gap-3 bg-slate-50">
+              <button onClick={closePagoModal} className="px-5 py-2.5 rounded-lg">Cancelar</button>
+              <button onClick={handleRegistrarPagoInv} disabled={isSaving} className="px-6 py-2.5 text-white bg-[#3173c6] rounded-lg font-bold">Procesar Salida</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Editar Pago de Inversor */}
+      {isDetailsModalOpen && selectedInvestor && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b bg-slate-50"><h2 className="text-lg font-bold">Detalles - {selectedInvestor.nombre}</h2><button onClick={() => setIsDetailsModalOpen(false)}><X size={20} /></button></div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-4 gap-4 mb-8 bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                <div><p className="text-[10px] text-slate-500 font-bold uppercase">DNI</p><p className="text-sm font-semibold">{selectedInvestor.dni || '-'}</p></div>
+                <div><p className="text-[10px] text-slate-500 font-bold uppercase">Teléfono</p><p className="text-sm font-semibold">{selectedInvestor.telefono || '-'}</p></div>
+                <div className="col-span-2"><p className="text-[10px] text-slate-500 font-bold uppercase">Monto Invertido</p><p className="text-xl font-bold text-[#3173c6]">S/ {selectedInvestor.monto}</p></div>
+              </div>
+              <h3 className="font-bold text-slate-700 mb-3 border-b pb-2 flex items-center gap-2"><Users size={16} /> Préstamos Asignados</h3>
+              <div className="border rounded-xl bg-white shadow-sm overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 border-b"><tr><th className="p-3">Cliente</th><th className="p-3">Monto Orig.</th><th className="p-3 text-center">Estado</th></tr></thead>
+                  <tbody>
+                    {prestamos.filter(p => p.selectedInvestors?.includes(selectedInvestor.id)).map(loan => (
+                      <tr key={loan.id} className="border-b"><td className="p-3 font-medium">{loan.clienteNombre}</td><td className="p-3 font-bold">S/ {loan.monto}</td><td className="p-3 text-center"><span className="bg-slate-200 px-2 py-1 rounded text-[10px] font-bold">{getEstadoPrestamo(loan)}</span></td></tr>
+                    ))}
+                    {prestamos.filter(p => p.selectedInvestors?.includes(selectedInvestor.id)).length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-500">Sin préstamos.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="p-5 border-t bg-slate-50 flex justify-end"><button onClick={()=>setIsDetailsModalOpen(false)} className="px-8 py-2.5 text-white bg-[#3173c6] rounded-lg">Cerrar</button></div>
+          </div>
+        </div>
+      )}
+
       {isEditPagoModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800">Modificar Pago Realizado</h2>
-              <button onClick={() => setIsEditPagoModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
-            </div>
-            <div className="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-2">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Inversionista</label>
-                  <input type="text" readOnly value={editPagoForm.inversionistaNombre} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-not-allowed" />
-               </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Fecha</label>
-                  <input type="date" value={editPagoForm.fecha} onChange={e=>setEditPagoForm({...editPagoForm, fecha: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6]" />
-                 </div>
-                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Monto (S/)</label>
-                  <input type="number" value={editPagoForm.monto} onChange={e=>setEditPagoForm({...editPagoForm, monto: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold focus:outline-none focus:border-[#3173c6]" />
-                 </div>
-               </div>
-               <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Concepto Aplicado</label>
-                  <div className="relative">
-                    <select value={editPagoForm.concepto} onChange={e=>setEditPagoForm({...editPagoForm, concepto: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm appearance-none focus:outline-none focus:border-[#3173c6] bg-white">
-                      <option value="Interés">Pago de Interés</option>
-                      <option value="Devolución">Devolución de Capital</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                  </div>
-               </div>
-               <p className="text-xs text-rose-500 bg-rose-50 p-2 rounded border border-rose-100">
-                 <b>Nota:</b> Modificar un registro antiguo desde aquí no recalculará el capital actual del inversionista automáticamente. Si cambias un monto de "Devolución", ajusta el capital manualmente editando al Inversor.
-               </p>
-            </div>
-            <div className="p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-white sm:bg-slate-50">
-              <button onClick={() => setIsEditPagoModalOpen(false)} className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200 border border-slate-200 sm:border-transparent rounded-lg transition-colors">Cancelar</button>
-              <button onClick={handleGuardarEditPagoInv} disabled={isSaving} className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-[#3173c6] hover:bg-[#2860a8] rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors">
-                {isSaving ? <RefreshCcw size={16} className="animate-spin" /> : 'Guardar Cambios'}
-              </button>
-            </div>
-          </div>
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
+           <div className="bg-white p-6 rounded-xl shadow-2xl w-96">
+              <h2 className="font-bold mb-4">Editar Pago</h2>
+              <input type="date" value={editPagoForm.fecha} onChange={e=>setEditPagoForm({...editPagoForm, fecha: e.target.value})} className="w-full border p-2 mb-3 rounded" />
+              <input type="number" value={editPagoForm.monto} onChange={e=>setEditPagoForm({...editPagoForm, monto: e.target.value})} className="w-full border p-2 mb-3 rounded font-bold" />
+              <select value={editPagoForm.concepto} onChange={e=>setEditPagoForm({...editPagoForm, concepto: e.target.value})} className="w-full border p-2 mb-4 rounded"><option value="Interés">Interés</option><option value="Devolución">Devolución</option></select>
+              <div className="flex justify-end gap-2"><button onClick={()=>setIsEditPagoModalOpen(false)}>Cancelar</button><button onClick={handleGuardarEditPagoInv} className="bg-blue-600 text-white px-4 py-2 rounded">Guardar</button></div>
+           </div>
         </div>
       )}
 
-      {/* Modal Ver Detalle de Pago Inversionista */}
       {isViewPagoModalOpen && selectedPagoModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800">Recibo de Salida</h2>
-              <button onClick={() => setIsViewPagoModalOpen(false)} className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-200 p-1.5 rounded-full transition-colors"><X size={20} /></button>
-            </div>
-            <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto">
-              <div className={`${selectedPagoModal.concepto === 'Devolución' ? 'bg-rose-50/50 border-rose-100' : 'bg-blue-50/50 border-blue-100'} border rounded-xl p-4 mb-6 flex flex-col items-center justify-center text-center`}>
-                 <p className={`text-xs uppercase tracking-widest font-bold mb-1 ${selectedPagoModal.concepto === 'Devolución' ? 'text-rose-600' : 'text-blue-600'}`}>Monto Entregado</p>
-                 <p className={`text-4xl font-black ${selectedPagoModal.concepto === 'Devolución' ? 'text-rose-700' : 'text-[#3173c6]'}`}>S/ {selectedPagoModal.monto}</p>
-                 <span className="mt-2 bg-white px-3 py-1 rounded-full text-xs font-bold text-slate-500 shadow-sm border border-slate-100">{selectedPagoModal.fecha}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-y-6 gap-x-4 px-2">
-                <div className="col-span-2 sm:col-span-1">
-                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-bold">Inversionista</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedPagoModal.inversionistaNombre}</p>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-bold">Concepto</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedPagoModal.concepto}</p>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <p className="text-[10px] text-slate-500 mb-0.5 uppercase tracking-wider font-bold">ID Transacción</p>
-                  <p className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded w-fit">{selectedPagoModal.id.slice(0,10)}</p>
-                </div>
-                
-                {selectedPagoModal.documento && (
-                  <div className="col-span-2 mt-2 pt-4 border-t border-slate-100">
-                    <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-bold">Comprobante / Voucher</p>
-                    <button 
-                      onClick={() => openPreview(selectedPagoModal.documento.name, selectedPagoModal.documento.data)}
-                      className="flex items-center justify-center gap-2 text-sm font-bold text-[#3173c6] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-4 py-2.5 rounded-lg transition-colors w-full sm:w-fit"
-                    >
-                      <Eye size={18} /> Ver Documento Adjunto
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="p-5 border-t border-slate-200 flex justify-end bg-white sm:bg-slate-50">
-              <button onClick={() => setIsViewPagoModalOpen(false)} className="w-full sm:w-auto px-8 py-2.5 text-sm font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-sm transition-colors">Cerrar Recibo</button>
-            </div>
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+             <h2 className="font-bold text-lg mb-4 border-b pb-2">Recibo de Salida</h2>
+             <div className="text-center mb-6"><p className="text-4xl font-black text-rose-600">S/ {selectedPagoModal.monto}</p><p className="text-sm font-bold text-slate-500">{selectedPagoModal.fecha}</p></div>
+             <div className="grid grid-cols-2 gap-4 text-sm mb-6">
+                <div><b>Inversor:</b><br/>{selectedPagoModal.inversionistaNombre}</div>
+                <div><b>Concepto:</b><br/>{selectedPagoModal.concepto}</div>
+             </div>
+             {selectedPagoModal.documento && <button onClick={()=>openPreview(selectedPagoModal.documento.name, selectedPagoModal.documento.data)} className="w-full bg-blue-50 text-blue-600 p-2 rounded font-bold flex items-center justify-center gap-2 mb-4"><Eye size={16}/> Ver Voucher</button>}
+             <button onClick={()=>setIsViewPagoModalOpen(false)} className="w-full bg-slate-800 text-white p-2 rounded">Cerrar</button>
           </div>
         </div>
       )}
 
-      {/* Modal Previsualización de Archivos */}
       {previewModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[70] flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col h-[90vh] sm:h-[85vh] animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-              <h3 className="font-bold text-slate-800 truncate pr-4 flex items-center gap-2 text-sm sm:text-base">
-                <Eye size={18} className="text-[#3173c6] flex-shrink-0" /> <span className="truncate">{previewModal.name}</span>
-              </h3>
-              <button onClick={() => setPreviewModal({isOpen: false, name: '', data: null})} className="text-slate-500 hover:text-slate-800 bg-slate-200/50 hover:bg-slate-200 p-1.5 rounded-full transition-colors flex-shrink-0"><X size={20}/></button>
-            </div>
-            <div className="flex-1 bg-slate-100 flex items-center justify-center p-2 sm:p-4 overflow-hidden relative">
-              {previewModal.data ? (
-                previewModal.data.startsWith('data:image/') ? (
-                  <img src={previewModal.data} alt="Vista Previa" className="max-w-full max-h-full object-contain shadow-lg rounded bg-white" />
-                ) : previewModal.data.startsWith('data:application/pdf') ? (
-                  <iframe src={previewModal.data} className="w-full h-full rounded shadow-lg border-0 bg-white" title="PDF Preview" />
-                ) : (
-                  <div className="text-center text-slate-500 flex flex-col items-center p-8">
-                    <FileText size={48} className="mb-3 opacity-50 text-slate-400" />
-                    <p className="font-medium text-lg">Vista previa no disponible</p>
-                  </div>
-                )
-              ) : (
-                <div className="text-center text-slate-500 flex flex-col items-center bg-white p-6 sm:p-10 rounded-xl shadow-sm border border-slate-200 mx-4">
-                  <Cloud size={64} className="mb-4 text-[#3173c6] opacity-80" />
-                  <p className="text-lg sm:text-xl font-bold text-slate-700">Archivo antiguo o sin datos</p>
-                  <p className="text-sm mt-3 text-slate-500 max-w-md leading-relaxed">Para visualizar este archivo, necesitas volver a subirlo o implementar Firebase Cloud Storage.</p>
-                </div>
-              )}
-            </div>
+        <div className="fixed inset-0 bg-slate-900/90 z-[80] flex items-center justify-center p-4">
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col">
+              <div className="flex justify-between p-4 border-b"><h3 className="font-bold truncate">{previewModal.name}</h3><button onClick={()=>setPreviewModal({isOpen:false, name:'', data:null})}><X/></button></div>
+              <div className="flex-1 bg-slate-100 flex items-center justify-center overflow-hidden p-4">
+                 {previewModal.data && previewModal.data.startsWith('data:image/') ? <img src={previewModal.data} className="max-w-full max-h-full object-contain" alt="preview"/> : <p>Vista no disponible o PDF descargable.</p>}
+              </div>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Pagos() {
+  const user = useContext(UserContext);
+  const [clienteSearch, setClienteSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedPrestamo, setSelectedPrestamo] = useState(null);
+  const [form, setForm] = useState({ fechaPago: '', montoPagado: '', banco: 'Efectivo', concepto: 'Interés', comentario: '' });
+  const [prestamosDb, setPrestamosDb] = useState([]);
+  const [pagosDb, setPagosDb] = useState([]);
+  const [investorsDb, setInvestorsDb] = useState([]);
+  const [pagoSearchTerm, setPagoSearchTerm] = useState('');
+  const [filterFechaPrestamo, setFilterFechaPrestamo] = useState('');
+  const [filterFechaPago, setFilterFechaPago] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [pagoVoucher, setPagoVoucher] = useState(null);
+  const [previewModal, setPreviewModal] = useState({ isOpen: false, name: '', data: null });
+  const [isViewPagoModalOpen, setIsViewPagoModalOpen] = useState(false);
+  const [isEditPagoModalOpen, setIsEditPagoModalOpen] = useState(false);
+  const [selectedPagoModal, setSelectedPagoModal] = useState(null);
+
+  useEffect(() => {
+    const presRef = getCollectionRef(user, 'prestamos');
+    const pagRef = getCollectionRef(user, 'pagos');
+    const invRef = getCollectionRef(user, 'inversionistas');
+    if(!presRef || !pagRef || !invRef) return;
+    const unsubP = onSnapshot(presRef, snap => setPrestamosDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubPag = onSnapshot(pagRef, snap => setPagosDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubInv = onSnapshot(invRef, snap => setInvestorsDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    return () => { unsubP(); unsubPag(); unsubInv(); };
+  }, [user]);
+
+  const handleVoucherUpload = (e) => { 
+    const file = e.target.files[0]; 
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => { setPagoVoucher({ name: file.name, data: reader.result }); };
+    reader.readAsDataURL(file);
+  };
+
+  const openPreview = (name, data) => { setPreviewModal({ isOpen: true, name, data }); };
+
+  const filteredPrestamos = prestamosDb.filter(p => p.clienteNombre && p.clienteNombre.toLowerCase().includes(clienteSearch.toLowerCase()));
+  
+  const filteredPagosHistory = pagosDb.filter(p => {
+      const matchClient = p.clienteNombre && p.clienteNombre.toLowerCase().includes(pagoSearchTerm.toLowerCase());
+      const matchDatePres = filterFechaPrestamo === '' || p.fechaPrestamo === filterFechaPrestamo;
+      const matchDatePago = filterFechaPago === '' || p.fechaPago === filterFechaPago;
+      return matchClient && matchDatePres && matchDatePago;
+  }).sort((a,b) => new Date(b.fechaPago) - new Date(a.fechaPago));
+
+  const handleRegistrarPago = async () => {
+    if(!selectedPrestamo || !form.montoPagado || !form.fechaPago) return alert("Complete los datos básicos del pago.");
+    setIsSaving(true);
+    try {
+      const saldoActual = parseFloat(selectedPrestamo.saldo !== undefined ? selectedPrestamo.saldo : selectedPrestamo.monto);
+      const tasa = parseFloat(selectedPrestamo.tasa || 0);
+      const interesGenerado = saldoActual * (tasa / 100);
+      const montoPagado = parseFloat(form.montoPagado);
+      let interesCobrado = 0; let nuevoSaldo = saldoActual;
+
+      if (form.concepto === 'Interés') interesCobrado = montoPagado;
+      else if (form.concepto === 'Amortización') nuevoSaldo -= montoPagado;
+      else if (form.concepto === 'Ambos (Interés + Amortización)') {
+        interesCobrado = interesGenerado; if (interesCobrado > montoPagado) interesCobrado = montoPagado;
+        const amortizacion = montoPagado - interesCobrado; if (amortizacion > 0) nuevoSaldo -= amortizacion;
+      }
+      if (nuevoSaldo < 0.01) nuevoSaldo = 0;
+
+      let interesInversionistasCobrado = 0;
+      if (interesCobrado > 0 && selectedPrestamo.financingSources?.includes('inversionista')) {
+        let intInvTeorico = 0;
+        selectedPrestamo.selectedInvestors?.forEach(invId => {
+           const inv = investorsDb.find(i => i.id === invId);
+           intInvTeorico += (parseFloat(selectedPrestamo.investorAmounts?.[invId] || 0) * (parseFloat(inv?.tasa || 0) / 100));
+        });
+        let prop = 1; if (interesGenerado > 0) { prop = interesCobrado / interesGenerado; if(prop>1)prop=1; }
+        interesInversionistasCobrado = intInvTeorico * prop;
+      }
+
+      let nuevaProxima = selectedPrestamo.proximaFechaPago || getFechaUnMesDespues(selectedPrestamo.fecha);
+      if (form.concepto !== 'Amortización' && nuevaProxima) {
+         const d = new Date(nuevaProxima + 'T00:00:00');
+         if (!isNaN(d.getTime())) { d.setMonth(d.getMonth() + 1); nuevaProxima = d.toISOString().split('T')[0]; }
+      }
+
+      await addDoc(getCollectionRef(user, 'pagos'), {
+        prestamoId: selectedPrestamo.id, clienteNombre: selectedPrestamo.clienteNombre, fechaPrestamo: selectedPrestamo.fecha || '-',
+        fechaPago: form.fechaPago, montoPagado: form.montoPagado, banco: form.banco, concepto: form.concepto, comentario: form.comentario,
+        interesCobrado: interesCobrado.toFixed(2), interesInversionistas: interesInversionistasCobrado.toFixed(2), voucher: pagoVoucher, createdAt: serverTimestamp()
+      });
+      await updateDoc(getDocRef(user, 'prestamos', selectedPrestamo.id), { saldo: nuevoSaldo.toFixed(2), proximaFechaPago: nuevaProxima });
+
+      alert("Pago registrado con éxito");
+      setForm({ fechaPago: '', montoPagado: '', banco: 'Efectivo', concepto: 'Interés', comentario: '' }); setClienteSearch(''); setSelectedPrestamo(null); setPagoVoucher(null);
+    } catch(e) { console.error(e); } finally { setIsSaving(false); }
+  };
+
+  const openEditPago = (pago) => {
+    setEditPagoForm({
+      id: pago.id,
+      clienteNombre: pago.clienteNombre || '',
+      fechaPrestamo: pago.fechaPrestamo || '',
+      fechaPago: pago.fechaPago || '',
+      montoPagado: pago.montoPagado || '',
+      banco: pago.banco || '',
+      concepto: pago.concepto || '',
+      comentario: pago.comentario || ''
+    });
+    setIsEditPagoModalOpen(true);
+  };
+
+  const handleGuardarEditPago = async () => {
+    if(!editPagoForm.montoPagado) return alert("El monto es obligatorio");
+    setIsSaving(true);
+    try {
+      await updateDoc(getDocRef(user, 'pagos', editPagoForm.id), {
+        fechaPago: editPagoForm.fechaPago, montoPagado: editPagoForm.montoPagado,
+        banco: editPagoForm.banco, concepto: editPagoForm.concepto, comentario: editPagoForm.comentario
+      });
+      setIsEditPagoModalOpen(false);
+    } catch (e) { console.error("Error al actualizar pago:", e); } finally { setIsSaving(false); }
+  };
+
+  return (
+    <div className="w-full flex flex-col gap-10">
+      <div className="w-full max-w-2xl bg-white border p-6 rounded-lg shadow-sm">
+        <h1 className="text-xl font-bold mb-4">Registrar Pago a Préstamo</h1>
+        <div className="mb-4 relative">
+          <label className="text-xs font-bold">Buscar Cliente Deudor</label>
+          <input type="text" value={clienteSearch} onChange={e=>{setClienteSearch(e.target.value); setSelectedPrestamo(null);}} onFocus={()=>setShowDropdown(true)} onBlur={()=>setTimeout(()=>setShowDropdown(false), 200)} placeholder="Escribir nombre..." className="w-full border p-2 rounded"/>
+          {showDropdown && filteredPrestamos.length > 0 && (
+            <ul className="absolute z-10 bg-white border w-full max-h-48 overflow-y-auto shadow-lg">
+              {filteredPrestamos.filter(p=>parseFloat(p.saldo !== undefined ? p.saldo : p.monto)>0).map(c=>(
+                <li key={c.id} onMouseDown={()=>{setClienteSearch(c.clienteNombre); setSelectedPrestamo(c); setShowDropdown(false)}} className="p-2 hover:bg-blue-50 cursor-pointer border-b flex justify-between text-sm">
+                  <b>{c.clienteNombre}</b> <span>Saldo: S/{c.saldo !== undefined ? c.saldo : c.monto}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {selectedPrestamo && (
+          <div className="bg-blue-50 p-4 rounded mb-4 text-sm flex justify-between border border-blue-200">
+             <span><b>Deuda Original:</b> S/{selectedPrestamo.monto}</span>
+             <span className="text-rose-600 font-bold"><b>Saldo Pendiente:</b> S/{selectedPrestamo.saldo !== undefined ? selectedPrestamo.saldo : selectedPrestamo.monto}</span>
           </div>
+        )}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div><label className="text-xs font-bold">Fecha de Pago</label><input type="date" value={form.fechaPago} onChange={e=>setForm({...form,fechaPago:e.target.value})} className="w-full border p-2 rounded"/></div>
+          <div><label className="text-xs font-bold">Monto Recibido</label><input type="number" value={form.montoPagado} onChange={e=>setForm({...form,montoPagado:e.target.value})} className="w-full border p-2 rounded font-bold"/></div>
+          <div><label className="text-xs font-bold">Concepto</label>
+            <select value={form.concepto} onChange={e=>setForm({...form,concepto:e.target.value})} className="w-full border p-2 rounded bg-white"><option>Interés</option><option>Amortización</option><option>Ambos (Interés + Amortización)</option></select>
+          </div>
+          <div><label className="text-xs font-bold">Método</label>
+            <select value={form.banco} onChange={e=>setForm({...form,banco:e.target.value})} className="w-full border p-2 rounded bg-white"><option>Efectivo</option><option>BCP</option><option>Interbank</option><option>Yape / Plin</option></select>
+          </div>
+          {form.banco !== 'Efectivo' && (
+            <div className="col-span-2 flex items-center gap-2 mt-2">
+               <div className="relative border border-dashed p-2 rounded w-full text-center text-sm bg-slate-50 cursor-pointer">
+                 {pagoVoucher ? pagoVoucher.name : 'Adjuntar Voucher'} <input type="file" onChange={handleVoucherUpload} className="absolute left-0 top-0 opacity-0 w-full h-full cursor-pointer"/>
+               </div>
+               {pagoVoucher && <button onClick={(e)=>{e.preventDefault(); openPreview(pagoVoucher.name, pagoVoucher.data)}} className="p-2 border rounded bg-white"><Eye size={16}/></button>}
+            </div>
+          )}
+        </div>
+        <button onClick={handleRegistrarPago} disabled={!selectedPrestamo || isSaving} className="w-full bg-[#3173c6] text-white font-bold p-3 rounded hover:bg-[#2860a8] disabled:bg-slate-300">
+          {isSaving ? 'Procesando...' : 'Procesar Ingreso'}
+        </button>
+      </div>
+
+      <div className="w-full max-w-5xl">
+        <h2 className="text-xl font-bold mb-4">Historial de Pagos de Clientes</h2>
+        <div className="flex flex-col md:flex-row gap-4 mb-4 p-4 bg-slate-50 border rounded-lg">
+           <div className="flex-1"><label className="text-[10px] font-bold block mb-1">Buscar Cliente</label><input type="text" placeholder="Escribir..." value={pagoSearchTerm} onChange={e=>setPagoSearchTerm(e.target.value)} className="border p-2 rounded w-full text-sm outline-none"/></div>
+           <div><label className="text-[10px] font-bold block mb-1">Filtro: F. Préstamo</label><div className="flex gap-1"><input type="date" value={filterFechaPrestamo} onChange={e=>setFilterFechaPrestamo(e.target.value)} className="border p-2 rounded text-sm"/>{filterFechaPrestamo&&<button onClick={()=>setFilterFechaPrestamo('')} className="bg-white border px-2 rounded"><X size={14}/></button>}</div></div>
+           <div><label className="text-[10px] font-bold block mb-1">Filtro: F. Pago Realizado</label><div className="flex gap-1"><input type="date" value={filterFechaPago} onChange={e=>setFilterFechaPago(e.target.value)} className="border p-2 rounded text-sm"/>{filterFechaPago&&<button onClick={()=>setFilterFechaPago('')} className="bg-white border px-2 rounded"><X size={14}/></button>}</div></div>
+        </div>
+        <div className="bg-white border rounded-lg overflow-x-auto shadow-sm">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-slate-50 border-b"><tr><th className="p-3">Cliente</th><th className="p-3">F. Préstamo</th><th className="p-3">F. Pago</th><th className="p-3">Concepto</th><th className="p-3">Monto Total</th><th className="p-3">Ganancia Empresa</th><th className="p-3 text-right">Acciones</th></tr></thead>
+            <tbody>
+              {filteredPagosHistory.length > 0 ? filteredPagosHistory.map(p => (
+                <tr key={p.id} className="border-b hover:bg-slate-50">
+                  <td className="p-3 font-bold text-slate-800">{p.clienteNombre}</td>
+                  <td className="p-3 text-slate-500">{p.fechaPrestamo}</td>
+                  <td className="p-3 font-medium">{p.fechaPago}</td>
+                  <td className="p-3 text-xs"><span className="border px-2 py-1 rounded bg-slate-100">{p.concepto}</span></td>
+                  <td className="p-3 font-black text-emerald-700">S/ {p.montoPagado}</td>
+                  <td className="p-3 font-bold text-[#3173c6]">S/ {Math.max(0, parseFloat(p.concepto==='Interés'?p.montoPagado:p.interesCobrado||0) - parseFloat(p.interesInversionistas||0)).toFixed(2)}</td>
+                  <td className="p-3 text-right">
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => openEditPago(p)} className="bg-white border text-xs px-3 py-1.5 rounded hover:bg-slate-100">Editar</button>
+                      <button onClick={() => { setSelectedPagoModal(p); setIsViewPagoModalOpen(true); }} className="bg-slate-800 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-700">Ver</button>
+                    </div>
+                  </td>
+                </tr>
+              )) : <tr><td colSpan="7" className="p-6 text-center text-slate-500">No se encontraron pagos con estos filtros.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {isEditPagoModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
+           <div className="bg-white p-6 rounded-xl shadow-2xl w-96">
+              <h2 className="font-bold mb-4">Editar Pago</h2>
+              <input type="date" value={editPagoForm.fechaPago} onChange={e=>setEditPagoForm({...editPagoForm, fechaPago: e.target.value})} className="w-full border p-2 mb-3 rounded" />
+              <input type="number" value={editPagoForm.montoPagado} onChange={e=>setEditPagoForm({...editPagoForm, montoPagado: e.target.value})} className="w-full border p-2 mb-3 rounded font-bold" />
+              <select value={editPagoForm.concepto} onChange={e=>setEditPagoForm({...editPagoForm, concepto: e.target.value})} className="w-full border p-2 mb-4 rounded"><option value="Interés">Interés</option><option value="Amortización">Amortización</option><option value="Ambos (Interés + Amortización)">Ambos</option></select>
+              <div className="flex justify-end gap-2"><button onClick={()=>setIsEditPagoModalOpen(false)}>Cancelar</button><button onClick={handleGuardarEditPago} className="bg-blue-600 text-white px-4 py-2 rounded">Guardar</button></div>
+           </div>
+        </div>
+      )}
+
+      {isViewPagoModalOpen && selectedPagoModal && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+             <h2 className="font-bold text-lg mb-4 border-b pb-2">Recibo de Pago</h2>
+             <div className="text-center mb-6"><p className="text-4xl font-black text-emerald-600">S/ {selectedPagoModal.montoPagado}</p><p className="text-sm font-bold text-slate-500 mt-1">{selectedPagoModal.fechaPago}</p></div>
+             
+             {selectedPagoModal.concepto === 'Ambos (Interés + Amortización)' && (
+                 <div className="flex justify-center gap-4 mb-4 border-t pt-4">
+                     <div className="text-center"><p className="text-[10px] uppercase font-bold text-slate-500">Interés</p><p className="font-bold">S/ {selectedPagoModal.interesCobrado}</p></div>
+                     <div className="text-center"><p className="text-[10px] uppercase font-bold text-slate-500">Amortización</p><p className="font-bold">S/ {(parseFloat(selectedPagoModal.montoPagado)-parseFloat(selectedPagoModal.interesCobrado)).toFixed(2)}</p></div>
+                 </div>
+             )}
+
+             <div className="grid grid-cols-2 gap-4 text-sm mb-6 border-t pt-4">
+                <div><b>Cliente:</b><br/>{selectedPagoModal.clienteNombre}</div>
+                <div><b>Concepto:</b><br/>{selectedPagoModal.concepto}</div>
+                <div><b>Banco:</b><br/>{selectedPagoModal.banco}</div>
+                <div><b>F. Préstamo Base:</b><br/>{selectedPagoModal.fechaPrestamo}</div>
+             </div>
+
+             {parseFloat(selectedPagoModal.interesInversionistas || 0) > 0 && (
+                <div className="bg-emerald-50 p-3 rounded mb-4 text-sm border border-emerald-100">
+                    <p className="flex justify-between mb-1"><span>Ganancia Bruta:</span> <b>S/ {selectedPagoModal.concepto === 'Interés' ? selectedPagoModal.montoPagado : selectedPagoModal.interesCobrado}</b></p>
+                    <p className="flex justify-between text-rose-600 mb-1"><span>A Inversores:</span> <b>- S/ {selectedPagoModal.interesInversionistas}</b></p>
+                    <p className="flex justify-between font-black text-emerald-800 border-t border-emerald-200 pt-1 mt-1"><span>Ganancia Real:</span> <span>S/ {(parseFloat(selectedPagoModal.concepto === 'Interés' ? selectedPagoModal.montoPagado : selectedPagoModal.interesCobrado) - parseFloat(selectedPagoModal.interesInversionistas)).toFixed(2)}</span></p>
+                </div>
+             )}
+
+             {selectedPagoModal.voucher && <button onClick={()=>openPreview(selectedPagoModal.voucher.name, selectedPagoModal.voucher.data)} className="w-full bg-blue-50 text-blue-600 p-2 rounded font-bold flex items-center justify-center gap-2 mb-4"><Eye size={16}/> Ver Voucher</button>}
+             <button onClick={()=>setIsViewPagoModalOpen(false)} className="w-full bg-slate-800 text-white p-2 rounded">Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {previewModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/90 z-[80] flex items-center justify-center p-4">
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col">
+              <div className="flex justify-between p-4 border-b"><h3 className="font-bold truncate">{previewModal.name}</h3><button onClick={()=>setPreviewModal({isOpen:false, name:'', data:null})}><X/></button></div>
+              <div className="flex-1 bg-slate-100 flex items-center justify-center overflow-hidden p-4">
+                 {previewModal.data && previewModal.data.startsWith('data:image/') ? <img src={previewModal.data} className="max-w-full max-h-full object-contain" alt="preview"/> : <p>Vista no disponible o PDF descargable.</p>}
+              </div>
+           </div>
         </div>
       )}
     </div>
@@ -2112,43 +1757,17 @@ function ListadoInversionistas() {
 function Reportes() {
   const user = useContext(UserContext);
   const [prestamos, setPrestamos] = useState([]);
-  const [pagosDb, setPagosDb] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
-  const reporteRef = useRef(null);
   
-  // Estado para las columnas visibles
   const [visibleColumns, setVisibleColumns] = useState({
-    cliente: true,
-    saldo: true,
-    tasa: true,
-    interes: true,
-    proximaFecha: true,
-    estado: true
+    cliente: true, saldo: true, tasa: true, interes: true, proximaFecha: true, estado: true
   });
 
   useEffect(() => {
     const presRef = getCollectionRef(user, 'prestamos');
-    const pagRef = getCollectionRef(user, 'pagos');
-    if(!presRef || !pagRef) return;
-
-    const unsubP = onSnapshot(presRef, snap => setPrestamos(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    const unsubPag = onSnapshot(pagRef, snap => setPagosDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    
-    return () => { unsubP(); unsubPag(); };
+    if(presRef) return onSnapshot(presRef, snap => setPrestamos(snap.docs.map(d => ({id: d.id, ...d.data()}))));
   }, [user]);
-
-  // Filtrar los datos con la lógica de estado calculada globalmente
-  const prestamosConEstado = prestamos.map(p => ({
-    ...p,
-    estadoCalculado: getEstadoPrestamo(p)
-  }));
-
-  const filteredPrestamos = prestamosConEstado.filter(p => {
-    const matchesSearch = p.clienteNombre?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'Todos' || p.estadoCalculado === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
 
   const calcularInteres = (prestamo) => {
     const m = parseFloat(prestamo.saldo !== undefined ? prestamo.saldo : prestamo.monto || 0);
@@ -2156,9 +1775,10 @@ function Reportes() {
     return (m * (t / 100)).toFixed(2);
   };
 
-  const toggleColumn = (col) => {
-    setVisibleColumns(prev => ({ ...prev, [col]: !prev[col] }));
-  };
+  const prestamosConEstado = prestamos.map(p => ({ ...p, estadoCalculado: getEstadoPrestamo(p) }));
+  const filteredPrestamos = prestamosConEstado.filter(p => p.clienteNombre?.toLowerCase().includes(searchTerm.toLowerCase()) && (filterStatus === 'Todos' || p.estadoCalculado === filterStatus));
+
+  const toggleColumn = (col) => setVisibleColumns(prev => ({ ...prev, [col]: !prev[col] }));
 
   const handleExportExcel = () => {
     const headers = [];
@@ -2182,152 +1802,64 @@ function Reportes() {
 
     const csvString = headers.join(",") + "\n" + rows.join("\n");
     const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
-    
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
     link.download = `reporte_prestamos_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
   return (
-    <div className="w-full max-w-[900px]">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-700">Reporte de Préstamos</h1>
-        <button 
-          onClick={handleExportExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-5 py-2.5 rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
-        >
-          <Download size={16} /> Descargar Excel
-        </button>
+    <div className="w-full max-w-5xl">
+      <div className="flex justify-between items-center mb-6">
+         <h1 className="text-xl font-bold">Reporte de Préstamos Activos</h1>
+         <button onClick={handleExportExcel} className="bg-emerald-600 text-white px-4 py-2 rounded flex items-center gap-2 shadow font-bold hover:bg-emerald-700"><Download size={16}/> Exportar a Excel</button>
       </div>
 
-      {/* Panel de Filtros y Configuración */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 mb-6 flex flex-col gap-5">
-        
-        {/* Barra de Búsqueda y Filtro de Estado */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por cliente..." 
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] bg-slate-50 focus:bg-white transition-all"
-            />
-          </div>
-          <div className="relative w-full md:w-56">
-            <select 
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full pl-4 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#3173c6] focus:ring-1 focus:ring-[#3173c6] appearance-none bg-slate-50 focus:bg-white text-slate-700 font-bold cursor-pointer transition-all"
-            >
-              <option value="Todos">Todos los estados</option>
-              <option value="Al día">Solo Al día</option>
-              <option value="Por vencer">Solo Por vencer</option>
-              <option value="Vencido">Solo Vencidos</option>
-              <option value="Congelado">Solo Congelados</option>
-              <option value="Pagado">Solo Pagados</option>
-            </select>
-            <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-          </div>
+      <div className="bg-white p-4 rounded-lg shadow-sm border mb-6 flex flex-col gap-4">
+        <div className="flex gap-4">
+          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente..." className="border p-2 rounded flex-1 outline-none focus:border-blue-500" />
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="border p-2 rounded bg-white w-48">
+            <option value="Todos">Todos los Estados</option><option value="Al día">Al día</option><option value="Por vencer">Por vencer</option><option value="Vencido">Vencidos</option><option value="Congelado">Congelados</option><option value="Pagado">Pagados</option>
+          </select>
         </div>
-
-        <hr className="border-slate-100" />
-
-        {/* Configuración de Columnas */}
-        <div>
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Settings size={14} className="text-[#3173c6]" />
-            Configurar Columnas Visibles
-          </h3>
-          <div className="flex flex-wrap gap-x-4 gap-y-3">
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={visibleColumns.cliente} onChange={() => toggleColumn('cliente')} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4 cursor-pointer" />
-              Cliente
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={visibleColumns.saldo} onChange={() => toggleColumn('saldo')} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4 cursor-pointer" />
-              Saldo
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={visibleColumns.tasa} onChange={() => toggleColumn('tasa')} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4 cursor-pointer" />
-              Tasa
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={visibleColumns.interes} onChange={() => toggleColumn('interes')} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4 cursor-pointer" />
-              Interés
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={visibleColumns.proximaFecha} onChange={() => toggleColumn('proximaFecha')} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4 cursor-pointer" />
-              Próx. Fecha
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-              <input type="checkbox" checked={visibleColumns.estado} onChange={() => toggleColumn('estado')} className="rounded border-slate-300 text-[#3173c6] focus:ring-[#3173c6] w-4 h-4 cursor-pointer" />
-              Estado
-            </label>
-          </div>
+        <div className="border-t pt-4">
+           <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Columnas Visibles</p>
+           <div className="flex gap-4 flex-wrap">
+              <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" checked={visibleColumns.cliente} onChange={()=>toggleColumn('cliente')}/> Cliente</label>
+              <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" checked={visibleColumns.saldo} onChange={()=>toggleColumn('saldo')}/> Saldo</label>
+              <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" checked={visibleColumns.tasa} onChange={()=>toggleColumn('tasa')}/> Tasa %</label>
+              <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" checked={visibleColumns.interes} onChange={()=>toggleColumn('interes')}/> Interés</label>
+              <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" checked={visibleColumns.proximaFecha} onChange={()=>toggleColumn('proximaFecha')}/> Próx. Fecha</label>
+              <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" checked={visibleColumns.estado} onChange={()=>toggleColumn('estado')}/> Estado</label>
+           </div>
         </div>
-
       </div>
 
-      <div ref={reporteRef} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-            <thead>
-              <tr className="bg-[#f0f3f7] text-slate-600 font-semibold border-b border-slate-200">
-                {visibleColumns.cliente && <th className="py-3.5 px-4 sm:px-6">Cliente</th>}
-                {visibleColumns.saldo && <th className="py-3.5 px-4 sm:px-6">Saldo</th>}
-                {visibleColumns.tasa && <th className="py-3.5 px-4 sm:px-6 text-center">Tasa</th>}
-                {visibleColumns.interes && <th className="py-3.5 px-4 sm:px-6">Interés</th>}
-                {visibleColumns.proximaFecha && <th className="py-3.5 px-4 sm:px-6">Próx. Fecha</th>}
-                {visibleColumns.estado && <th className="py-3.5 px-4 sm:px-6 text-center">Estado</th>}
+      <div className="bg-white border rounded overflow-x-auto shadow-sm">
+        <table className="w-full text-left text-sm whitespace-nowrap">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              {visibleColumns.cliente && <th className="p-3">Cliente</th>}
+              {visibleColumns.saldo && <th className="p-3">Saldo</th>}
+              {visibleColumns.tasa && <th className="p-3 text-center">Tasa %</th>}
+              {visibleColumns.interes && <th className="p-3 text-amber-600">Interés / Mes</th>}
+              {visibleColumns.proximaFecha && <th className="p-3">Próx. Pago</th>}
+              {visibleColumns.estado && <th className="p-3 text-center">Estado</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredPrestamos.map(p => (
+              <tr key={p.id} className="border-b hover:bg-slate-50">
+                {visibleColumns.cliente && <td className="p-3 font-medium text-slate-700">{p.clienteNombre}</td>}
+                {visibleColumns.saldo && <td className="p-3 font-bold text-slate-800">S/ {p.saldo!==undefined?p.saldo:p.monto}</td>}
+                {visibleColumns.tasa && <td className="p-3 text-center">{p.tasa}%</td>}
+                {visibleColumns.interes && <td className="p-3 font-bold text-amber-600">S/ {calcularInteres(p)}</td>}
+                {visibleColumns.proximaFecha && <td className="p-3 text-slate-500">{p.proximaFechaPago || getFechaUnMesDespues(p.fecha)}</td>}
+                {visibleColumns.estado && <td className="p-3 text-center"><span className="bg-slate-200 px-2 py-1 rounded font-bold text-[10px] uppercase">{p.estadoCalculado}</span></td>}
               </tr>
-            </thead>
-            <tbody>
-              {filteredPrestamos.map((p) => {
-                const estado = p.estadoCalculado;
-                return (
-                  <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    {visibleColumns.cliente && <td className="py-3 px-4 sm:px-6 font-medium text-slate-700">{p.clienteNombre}</td>}
-                    {visibleColumns.saldo && <td className="py-3 px-4 sm:px-6 font-bold text-slate-800">S/ {parseFloat(p.saldo !== undefined ? p.saldo : p.monto).toFixed(2)}</td>}
-                    {visibleColumns.tasa && <td className="py-3 px-4 sm:px-6 text-center text-slate-600">{p.tasa}%</td>}
-                    {visibleColumns.interes && <td className="py-3 px-4 sm:px-6 font-bold text-amber-600">S/ {calcularInteres(p)}</td>}
-                    {visibleColumns.proximaFecha && <td className="py-3 px-4 sm:px-6 text-slate-600 font-medium">{p.proximaFechaPago || getFechaUnMesDespues(p.fecha)}</td>}
-                    {visibleColumns.estado && (
-                      <td className="py-3 px-4 sm:px-6 text-center">
-                        <span className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-[10px] font-bold uppercase tracking-wide
-                          ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 
-                            estado === 'Vencido' ? 'bg-rose-100 text-rose-800' : 
-                            estado === 'Congelado' ? 'bg-cyan-100 text-cyan-800' :
-                            'bg-amber-100 text-amber-800'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full 
-                            ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-600' : 
-                              estado === 'Vencido' ? 'bg-rose-600' : 
-                              estado === 'Congelado' ? 'bg-cyan-600' :
-                              'bg-amber-600'}`}></span>
-                          {estado}
-                        </span>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-              {filteredPrestamos.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Search size={32} className="opacity-20" />
-                      <p>No se encontraron préstamos que coincidan con los filtros.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+            {filteredPrestamos.length === 0 && <tr><td colSpan="6" className="p-10 text-center text-slate-500">No se encontraron registros.</td></tr>}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -2339,175 +1871,77 @@ function ReporteSunat() {
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
 
-  // Establecer fechas por defecto (Mes actual)
   useEffect(() => {
     const hoy = new Date();
-    const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
-    const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().split('T')[0];
-    setFechaInicio(primerDia);
-    setFechaFin(ultimoDia);
-  }, []);
-
-  // Obtener los pagos
-  useEffect(() => {
+    setFechaInicio(new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]);
+    setFechaFin(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().split('T')[0]);
     const pagRef = getCollectionRef(user, 'pagos');
-    if(!pagRef) return;
-    const unsub = onSnapshot(pagRef, snap => setPagos(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    return () => unsub();
+    if(pagRef) return onSnapshot(pagRef, snap => setPagos(snap.docs.map(d => ({id: d.id, ...d.data()}))));
   }, [user]);
 
-  // Filtrar y calcular la data de la tabla
-  const pagosFiltrados = pagos.filter(p => {
-    if (!p.fechaPago) return false;
-    return p.fechaPago >= fechaInicio && p.fechaPago <= fechaFin;
-  }).sort((a, b) => new Date(b.fechaPago) - new Date(a.fechaPago)); 
-
-  let totalGanancia = 0;
-  let totalSunat = 0;
+  const pagosFiltrados = pagos.filter(p => p.fechaPago >= fechaInicio && p.fechaPago <= fechaFin).sort((a, b) => new Date(b.fechaPago) - new Date(a.fechaPago)); 
+  let totalGanancia = 0; let totalSunat = 0;
 
   const filas = pagosFiltrados.map(p => {
     const montoRecibido = parseFloat(p.montoPagado || 0);
-    let gananciaBruta = 0;
-
-    if (p.concepto === 'Interés') {
-      gananciaBruta = montoRecibido;
-    } else if (p.concepto === 'Ambos (Interés + Amortización)') {
-      gananciaBruta = parseFloat(p.interesCobrado || 0);
-    } 
-
+    const gananciaBruta = p.concepto === 'Interés' ? montoRecibido : parseFloat(p.interesCobrado || 0);
     const interesInv = parseFloat(p.interesInversionistas || 0);
-    
-    // La ganancia real de la empresa es el interés bruto cobrado menos la tajada del inversor
     const gananciaReal = Math.max(0, gananciaBruta - interesInv);
     const sunat = gananciaReal * 0.05; 
-
-    totalGanancia += gananciaReal;
-    totalSunat += sunat;
-
+    totalGanancia += gananciaReal; totalSunat += sunat;
     return { ...p, montoRecibido, gananciaBruta, interesInv, gananciaReal, sunat };
   });
 
   const handleExportExcel = () => {
     const headers = ["Fecha de Pago", "Concepto", "Banco", "Monto Recibido (S/)", "Ganancia Bruta (S/)", "Pago Inversor (S/)", "Ganancia Real Neta (S/)", "SUNAT 5% (S/)"];
     const rows = filas.map(f => {
-      return [
-        `"${f.fechaPago}"`,
-        `"${f.concepto}"`,
-        `"${f.banco}"`,
-        `"${f.montoRecibido.toFixed(2)}"`,
-        `"${f.gananciaBruta.toFixed(2)}"`,
-        `"${f.interesInv.toFixed(2)}"`,
-        `"${f.gananciaReal.toFixed(2)}"`,
-        `"${f.sunat.toFixed(2)}"`
-      ].join(",");
+      return `"${f.fechaPago}","${f.concepto}","${f.banco}","${f.montoRecibido.toFixed(2)}","${f.gananciaBruta.toFixed(2)}","${f.interesInv.toFixed(2)}","${f.gananciaReal.toFixed(2)}","${f.sunat.toFixed(2)}"`;
     });
-
     rows.push(`"TOTALES","","","","","","${totalGanancia.toFixed(2)}","${totalSunat.toFixed(2)}"`);
-
     const csvString = headers.join(",") + "\n" + rows.join("\n");
     const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
-    
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
     link.download = `reporte_sunat_${fechaInicio}_al_${fechaFin}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
   return (
-    <div className="w-full max-w-[900px]">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-700 flex items-center gap-2">
-          <Calculator className="text-[#3173c6]" /> Reporte de Impuestos
-        </h1>
-        <button 
-          onClick={handleExportExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
-        >
-          <Download size={16} /> Descargar Excel
-        </button>
+    <div className="w-full max-w-5xl">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold flex items-center gap-2"><Calculator className="text-blue-600"/> Reporte de Impuestos</h1>
+        <button onClick={handleExportExcel} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded flex items-center gap-2 shadow font-bold"><Download size={16}/> Descargar Excel</button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 mb-6">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-1.5"><Search size={14}/> Filtrar Rango de Fechas</h3>
-        <div className="flex flex-col sm:flex-row items-end gap-4">
-          <div className="w-full sm:flex-1">
-            <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">Fecha Inicio</label>
-            <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] bg-slate-50 focus:bg-white" />
-          </div>
-          <div className="w-full sm:flex-1">
-            <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">Fecha Fin</label>
-            <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#3173c6] bg-slate-50 focus:bg-white" />
-          </div>
-        </div>
+      <div className="flex gap-4 mb-6 bg-white p-4 border rounded shadow-sm">
+        <div className="flex flex-col"><label className="text-xs font-bold text-slate-500 uppercase mb-1">Desde Fecha</label><input type="date" value={fechaInicio} onChange={e=>setFechaInicio(e.target.value)} className="border p-2 rounded outline-none"/></div>
+        <div className="flex flex-col"><label className="text-xs font-bold text-slate-500 uppercase mb-1">Hasta Fecha</label><input type="date" value={fechaFin} onChange={e=>setFechaFin(e.target.value)} className="border p-2 rounded outline-none"/></div>
+      </div>
+      
+      <div className="flex gap-4 mb-6">
+         <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-xl flex-1 shadow-sm"><p className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">Ganancia Real Neta Total</p><p className="text-3xl font-black text-emerald-700">S/ {totalGanancia.toFixed(2)}</p></div>
+         <div className="bg-rose-50 border border-rose-200 p-5 rounded-xl flex-1 shadow-sm"><p className="text-xs font-bold text-rose-800 uppercase tracking-wider mb-1">Total Impuesto a Pagar (5%)</p><p className="text-3xl font-black text-rose-700">S/ {totalSunat.toFixed(2)}</p></div>
       </div>
 
-      {/* Resumen Total */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 shadow-sm flex flex-col justify-center">
-            <p className="text-xs text-emerald-700 uppercase font-black tracking-wider mb-1 flex items-center gap-1.5"><TrendingUp size={16}/> Ganancia Real Neta</p>
-            <p className="text-3xl font-black text-emerald-800">S/ {totalGanancia.toFixed(2)}</p>
-         </div>
-         <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-sm flex flex-col justify-center relative overflow-hidden">
-            <p className="text-xs text-rose-700 uppercase font-black tracking-wider mb-1 flex items-center gap-1.5 relative z-10"><Calculator size={16}/> Total SUNAT (5%) a Pagar</p>
-            <p className="text-3xl font-black text-rose-800 relative z-10">S/ {totalSunat.toFixed(2)}</p>
-            <Calculator size={80} className="absolute -right-4 -bottom-4 text-rose-200/50" />
-         </div>
-      </div>
-
-      {/* Tabla */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-            <thead>
-              <tr className="bg-[#f0f3f7] text-slate-600 font-semibold border-b border-slate-200">
-                <th className="py-3.5 px-4 sm:px-6">Fecha de Pago</th>
-                <th className="py-3.5 px-4 sm:px-6">Concepto</th>
-                <th className="py-3.5 px-4 sm:px-6">Banco</th>
-                <th className="py-3.5 px-4 sm:px-6 text-right">Monto Recibido</th>
-                <th className="py-3.5 px-4 sm:px-6 text-right">Ganancia Real</th>
-                <th className="py-3.5 px-4 sm:px-6 text-right font-black text-rose-700">Impuesto 5%</th>
+      <div className="bg-white border rounded overflow-x-auto shadow-sm">
+        <table className="w-full text-left text-sm whitespace-nowrap">
+          <thead className="bg-slate-50 border-b"><tr><th className="p-3">Fecha</th><th className="p-3">Concepto</th><th className="p-3">Banco</th><th className="p-3 text-right">Monto Recibido</th><th className="p-3 text-right">Ganancia Real</th><th className="p-3 text-right font-bold text-rose-600">SUNAT 5%</th></tr></thead>
+          <tbody>
+            {filas.map(f => (
+              <tr key={f.id} className="border-b hover:bg-slate-50">
+                <td className="p-3 font-medium">{f.fechaPago}</td>
+                <td className="p-3 text-xs"><span className="border bg-slate-100 px-2 py-1 rounded">{f.concepto === 'Ambos (Interés + Amortización)' ? 'Ambos (Int. + Amort.)' : f.concepto}</span></td>
+                <td className="p-3 text-slate-600">{f.banco || '-'}</td>
+                <td className="p-3 text-right">S/ {f.montoRecibido.toFixed(2)}</td>
+                <td className="p-3 text-right">
+                  <span className="font-bold text-emerald-600 block">S/ {f.gananciaReal.toFixed(2)}</span>
+                  {f.interesInv > 0 ? <span className="text-[10px] text-slate-400">Bruto: S/{f.gananciaBruta.toFixed(2)} | Inv: -S/{f.interesInv.toFixed(2)}</span> : f.concepto === 'Ambos (Interés + Amortización)' ? <span className="text-[10px] text-slate-400">Int: S/{f.gananciaBruta.toFixed(2)}</span> : null}
+                </td>
+                <td className="p-3 text-right font-black text-rose-600 bg-rose-50/30">S/ {f.sunat.toFixed(2)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {filas.length > 0 ? (
-                filas.map((fila) => (
-                  <tr key={fila.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4 sm:px-6 text-slate-600 font-medium">{fila.fechaPago}</td>
-                    <td className="py-3 px-4 sm:px-6 text-slate-700">
-                      <span className="bg-slate-100 px-2 py-1 rounded text-xs font-semibold border border-slate-200">
-                        {fila.concepto === 'Ambos (Interés + Amortización)' ? 'Ambos (Int. + Amort.)' : fila.concepto}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 sm:px-6 text-slate-600">{fila.banco}</td>
-                    <td className="py-3 px-4 sm:px-6 font-semibold text-slate-800 text-right">S/ {fila.montoRecibido.toFixed(2)}</td>
-                    <td className="py-3 px-4 sm:px-6 text-right">
-                      <span className="font-bold text-emerald-600 block leading-tight">S/ {fila.gananciaReal.toFixed(2)}</span>
-                      {fila.interesInv > 0 ? (
-                        <span className="text-[10px] text-slate-400 font-medium block">
-                          Bruto: S/ {fila.gananciaBruta.toFixed(2)} | Inv: -S/ {fila.interesInv.toFixed(2)}
-                        </span>
-                      ) : fila.concepto === 'Ambos (Interés + Amortización)' ? (
-                        <span className="text-[10px] text-slate-400 font-medium block">Int: S/ {fila.gananciaBruta.toFixed(2)}</span>
-                      ) : null}
-                    </td>
-                    <td className="py-3 px-4 sm:px-6 font-black text-rose-600 text-right bg-rose-50/30">S/ {fila.sunat.toFixed(2)}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Calculator size={32} className="opacity-20" />
-                      <p>No se encontraron pagos en el rango seleccionado.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+            {filas.length === 0 && <tr><td colSpan="6" className="p-10 text-center text-slate-500">Sin movimientos en las fechas seleccionadas.</td></tr>}
+          </tbody>
+        </table>
       </div>
     </div>
   );
