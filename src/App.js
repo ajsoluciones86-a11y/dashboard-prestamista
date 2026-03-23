@@ -208,6 +208,7 @@ function DashboardPrincipal() {
   const [capitalInversionistas, setCapitalInversionistas] = useState(0);
   const [capitalPrestado, setCapitalPrestado] = useState(0);
   const [prestamosDb, setPrestamosDb] = useState([]);
+  const [pagosDb, setPagosDb] = useState([]);
   const [interesesACobrar, setInteresesACobrar] = useState(0);
   const [gananciaMes, setGananciaMes] = useState(0);
   const [clientesNuevos, setClientesNuevos] = useState(0);
@@ -231,21 +232,19 @@ function DashboardPrincipal() {
     });
     const unsubInv = onSnapshot(invRef, (snap) => setCapitalInversionistas(snap.docs.reduce((sum, doc) => sum + parseFloat(doc.data().monto || 0), 0)));
     const unsubPres = onSnapshot(presRef, (snap) => {
-      const data = snap.docs.map(doc => doc.data());
+      const data = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
       setPrestamosDb(data);
       setCapitalPrestado(data.reduce((sum, d) => sum + parseFloat(d.saldo !== undefined ? d.saldo : d.monto || 0), 0));
-      setInteresesACobrar(data.reduce((sum, d) => sum + (parseFloat(d.saldo !== undefined ? d.saldo : d.monto || 0) * (parseFloat(d.tasa || 0) / 100)), 0));
     });
     const unsubClientes = onSnapshot(cliRef, (snap) => setClientesNuevos(snap.docs.length));
     const unsubPagos = onSnapshot(pagRef, (snap) => {
-      const data = snap.docs.map(doc => doc.data());
+      const data = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
+      setPagosDb(data);
       
-      // Obtener el año y mes actual en formato "YYYY-MM"
       const hoy = new Date();
       const currentMonthStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 
       setGananciaMes(data.reduce((sum, d) => {
-        // Solo calcular si la fecha de pago corresponde al mes en curso
         if ((d.fechaPago || '').startsWith(currentMonthStr)) {
           if (d.concepto === 'Interés' || d.concepto === 'Ambos (Interés + Amortización)') {
               const gananciaBruta = parseFloat(d.interesCobrado || d.montoPagado || 0);
@@ -259,6 +258,31 @@ function DashboardPrincipal() {
 
     return () => { unsubConfig(); unsubInv(); unsubPres(); unsubClientes(); unsubPagos(); };
   }, [user]);
+
+  // Efecto para calcular el interés Por Cobrar en el mes en curso dinámicamente
+  useEffect(() => {
+    const hoy = new Date();
+    const currentMonthStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    
+    let porCobrar = 0;
+    prestamosDb.forEach(p => {
+      const saldo = parseFloat(p.saldo !== undefined ? p.saldo : p.monto || 0);
+      if (saldo > 0 && !p.congelado) {
+         const interesEsperado = saldo * (parseFloat(p.tasa || 0) / 100);
+         
+         const pagosEsteMes = pagosDb.filter(pago => 
+            pago.prestamoId === p.id && 
+            (pago.fechaPago || '').startsWith(currentMonthStr)
+         );
+         
+         const interesPagadoEsteMes = pagosEsteMes.reduce((sum, pago) => sum + parseFloat(pago.interesCobrado || 0), 0);
+         const pendiente = Math.max(0, interesEsperado - interesPagadoEsteMes);
+         
+         porCobrar += pendiente;
+      }
+    });
+    setInteresesACobrar(porCobrar);
+  }, [prestamosDb, pagosDb]);
 
   const handleSaveCapital = async () => {
     setIsEditingCapital(false);
@@ -336,7 +360,7 @@ function DashboardPrincipal() {
         <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex flex-col items-center justify-center text-center gap-2">
           <div className="p-2 bg-blue-100 text-blue-600 rounded-full"><PieChart size={20} /></div>
           <div className="leading-tight">
-            <div className="text-[10px] sm:text-xs text-slate-500 font-medium">Por Cobrar</div>
+            <div className="text-[10px] sm:text-xs text-slate-500 font-medium">Por Cobrar Mes</div>
             <div className="text-sm sm:text-base font-bold text-slate-800">S/ {formatCurrency(interesesACobrar)}</div>
           </div>
         </div>
@@ -357,11 +381,11 @@ function DashboardPrincipal() {
             <span className="font-semibold text-slate-800">S/ {formatCurrency(capitalPrestado)}</span>
           </div>
           <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-            <span>Total Cobrado (Ganancia Neta)</span>
+            <span>Total Cobrado (Ganancia Neta del Mes)</span>
             <span className="font-semibold text-slate-800 text-emerald-600">S/ {formatCurrency(gananciaMes)}</span>
           </div>
           <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-            <span>Intereses Totales Por Cobrar</span>
+            <span>Intereses Totales Por Cobrar (Este Mes)</span>
             <span className="font-semibold text-slate-800 text-amber-600">S/ {formatCurrency(interesesACobrar)}</span>
           </div>
           <div className="flex justify-between items-center">
@@ -582,6 +606,7 @@ function ListadoPrestamos() {
   const [clientsDb, setClientsDb] = useState([]);
   const [investorsDb, setInvestorsDb] = useState([]);
   const [prestamosDb, setPrestamosDb] = useState([]);
+  const [pagosDb, setPagosDb] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -615,12 +640,15 @@ function ListadoPrestamos() {
     const cliRef = getCollectionRef(user, 'clientes');
     const invRef = getCollectionRef(user, 'inversionistas');
     const presRef = getCollectionRef(user, 'prestamos');
-    if(!cliRef || !invRef || !presRef) return;
+    const pagRef = getCollectionRef(user, 'pagos');
+    
+    if(!cliRef || !invRef || !presRef || !pagRef) return;
 
     const unsubC = onSnapshot(cliRef, snap => setClientsDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
     const unsubI = onSnapshot(invRef, snap => setInvestorsDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
     const unsubP = onSnapshot(presRef, snap => setPrestamosDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    return () => { unsubC(); unsubI(); unsubP(); };
+    const unsubPag = onSnapshot(pagRef, snap => setPagosDb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    return () => { unsubC(); unsubI(); unsubP(); unsubPag(); };
   }, [user]);
 
   const toggleFinancingSource = (source) => {
@@ -786,7 +814,7 @@ function ListadoPrestamos() {
                     </td>
                     <td className="py-3 px-4 sm:px-6 text-right">
                       <div className="flex gap-2 justify-end">
-                        <button onClick={() => openEditLoan(p)} className="bg-white border border-slate-300 text-slate-600 text-xs px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">Editar</button>
+                        <button onClick={() => openEditLoan(p)} className="bg-white border border-slate-300 text-slate-600 text-xs px-4 py-1.5 rounded hover:bg-slate-50 transition-colors">Editar</button>
                         <button onClick={() => { setSelectedLoanView(p); setIsViewLoanModalOpen(true); }} className="bg-[#3173c6] text-white text-xs px-3 py-1.5 rounded hover:bg-[#2860a8] shadow-sm transition-colors">Detalles</button>
                       </div>
                     </td>
@@ -1120,6 +1148,9 @@ function ListadoPrestamos() {
               <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2 border-b pb-2"><TrendingUp size={16} className="text-emerald-600" /> Rentabilidad del Préstamo</h3>
               {(() => {
                 const desglose = getDesgloseGanancias(selectedLoanView);
+                const pagosDelPrestamo = pagosDb.filter(p => p.prestamoId === selectedLoanView.id);
+                const totalInteresPagado = pagosDelPrestamo.reduce((sum, p) => sum + parseFloat(p.interesCobrado || 0), 0);
+
                 return (
                   <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5 mb-6 shadow-sm">
                     <div className="flex flex-col gap-4">
@@ -1139,6 +1170,11 @@ function ListadoPrestamos() {
                       <div className="flex justify-between items-center bg-emerald-100/50 p-3 rounded-lg">
                         <span className="font-bold text-emerald-900 uppercase tracking-wide text-sm">Tu Ganancia Real (Neta):</span>
                         <span className="text-xl font-black text-emerald-700">S/ {desglose.miGananciaReal.toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center pt-2 border-t border-emerald-200 mt-1">
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Total Intereses Cobrados a la Fecha:</span>
+                        <span className="text-base font-black text-emerald-800">S/ {totalInteresPagado.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -1447,50 +1483,28 @@ function ListadoInversionistas() {
       )}
 
       {isDetailsModalOpen && selectedInvestor && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b bg-slate-50 flex-shrink-0"><h2 className="text-lg font-bold">Detalles - {selectedInvestor.nombre}</h2><button onClick={() => setIsDetailsModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button></div>
-            <div className="p-5 sm:p-6 overflow-y-auto flex-1">
-              {(() => {
-                const investorLoans = prestamos.filter(p => p.selectedInvestors?.includes(selectedInvestor.id));
-                const activeInvestorLoans = investorLoans.filter(p => getEstadoPrestamo(p) !== 'Pagado');
-                const capitalEnUso = activeInvestorLoans.reduce((sum, loan) => sum + parseFloat(loan.investorAmounts?.[selectedInvestor.id] || 0), 0);
-
-                return (
-                  <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-4 mb-8 bg-blue-50/50 p-5 rounded-xl border border-blue-100 shadow-sm">
-                      <div className="col-span-1"><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">DNI</p><p className="text-sm font-semibold text-slate-800">{selectedInvestor.dni || '-'}</p></div>
-                      <div className="col-span-1"><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Teléfono</p><p className="text-sm font-semibold text-slate-800">{selectedInvestor.telefono || '-'}</p></div>
-                      <div className="col-span-2"><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Dirección</p><p className="text-sm font-semibold text-slate-800">{selectedInvestor.direccion || '-'}</p></div>
-                      <div className="col-span-1 border-t border-blue-100/50 pt-4"><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Capital Registrado</p><p className="text-xl font-bold text-slate-700">S/ {selectedInvestor.monto || '0.00'}</p></div>
-                      <div className="col-span-1 border-t border-blue-100/50 pt-4"><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Capital en Préstamos</p><p className="text-xl font-bold text-[#3173c6]">S/ {capitalEnUso.toFixed(2)}</p></div>
-                      <div className="col-span-2 border-t border-blue-100/50 pt-4"><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tasa de Rendimiento</p><p className="text-xl font-bold text-emerald-600">{selectedInvestor.tasa || '0'}%</p></div>
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2 flex items-center gap-2"><Users size={16} className="text-[#3173c6]"/> Préstamos Asignados</h3>
-                    <div className="border border-slate-200 rounded-xl bg-white shadow-sm overflow-x-auto">
-                      <table className="w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 border-b border-slate-200"><tr className="text-slate-600 text-xs uppercase tracking-wider"><th className="py-3 px-4">Cliente</th><th className="py-3 px-4">Monto Orig.</th><th className="py-3 px-4 text-[#3173c6]">Su Inversión</th><th className="py-3 px-4">Próx. Pago</th><th className="py-3 px-4 text-center">Estado</th></tr></thead>
-                        <tbody>
-                          {investorLoans.map(loan => {
-                            const estado = getEstadoPrestamo(loan);
-                            return (
-                              <tr key={loan.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                                <td className="py-3.5 px-4 font-medium text-slate-800">{loan.clienteNombre}</td>
-                                <td className="py-3.5 px-4 font-semibold text-slate-700">S/ {loan.monto}</td>
-                                <td className="py-3.5 px-4 font-black text-[#3173c6]">S/ {loan.investorAmounts?.[selectedInvestor.id] || '0'}</td>
-                                <td className="py-3.5 px-4 text-slate-500">{loan.proximaFechaPago || getFechaUnMesDespues(loan.fecha)}</td>
-                                <td className="py-3.5 px-4 text-center"><span className={`inline-flex items-center gap-1.5 py-0.5 px-2.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${estado === 'Al día' || estado === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : estado === 'Vencido' ? 'bg-rose-100 text-rose-800' : estado === 'Congelado' ? 'bg-cyan-100 text-cyan-800' : 'bg-amber-100 text-amber-800'}`}>{estado}</span></td>
-                              </tr>
-                            )
-                          })}
-                          {investorLoans.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-500">No hay préstamos asignados a este inversionista.</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                );
-              })()}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b bg-slate-50"><h2 className="text-lg font-bold">Detalles - {selectedInvestor.nombre}</h2><button onClick={() => setIsDetailsModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button></div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-4 gap-4 mb-8 bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                <div><p className="text-[10px] text-slate-500 font-bold uppercase">DNI</p><p className="text-sm font-semibold">{selectedInvestor.dni || '-'}</p></div>
+                <div><p className="text-[10px] text-slate-500 font-bold uppercase">Teléfono</p><p className="text-sm font-semibold">{selectedInvestor.telefono || '-'}</p></div>
+                <div className="col-span-2"><p className="text-[10px] text-slate-500 font-bold uppercase">Monto Invertido</p><p className="text-xl font-bold text-[#3173c6]">S/ {selectedInvestor.monto}</p></div>
+              </div>
+              <h3 className="font-bold text-slate-700 mb-3 border-b pb-2 flex items-center gap-2"><Users size={16} /> Préstamos Asignados</h3>
+              <div className="border rounded-xl bg-white shadow-sm overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 border-b"><tr><th className="p-3">Cliente</th><th className="p-3">Monto Orig.</th><th className="p-3 text-center">Estado</th></tr></thead>
+                  <tbody>
+                    {prestamos.filter(p => p.selectedInvestors?.includes(selectedInvestor.id)).map(loan => (
+                      <tr key={loan.id} className="border-b"><td className="p-3 font-medium">{loan.clienteNombre}</td><td className="p-3 font-bold">S/ {loan.monto}</td><td className="p-3 text-center"><span className="bg-slate-200 px-2 py-1 rounded text-[10px] font-bold">{getEstadoPrestamo(loan)}</span></td></tr>
+                    ))}
+                    {prestamos.filter(p => p.selectedInvestors?.includes(selectedInvestor.id)).length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-500">Sin préstamos.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="p-5 border-t bg-slate-50 flex justify-end"><button onClick={()=>setIsDetailsModalOpen(false)} className="px-8 py-2.5 text-white bg-[#3173c6] rounded-lg hover:bg-[#2860a8] transition-colors">Cerrar</button></div>
+            <div className="p-5 border-t bg-slate-50 flex justify-end"><button onClick={()=>setIsDetailsModalOpen(false)} className="px-8 py-2.5 text-white bg-[#3173c6] rounded-lg">Cerrar</button></div>
           </div>
         </div>
       )}
