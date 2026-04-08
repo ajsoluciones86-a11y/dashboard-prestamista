@@ -10,7 +10,8 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
-const manualFirebaseConfig = {
+// --- FIREBASE SETUP ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyCz4997ZuPpvyaFee37fFeUn9SUE8QG7hQ",
   authDomain: "sistema-prestamos-43b76.firebaseapp.com",
   projectId: "sistema-prestamos-43b76",
@@ -18,36 +19,28 @@ const manualFirebaseConfig = {
   messagingSenderId: "530325274830",
   appId: "1:530325274830:web:b94b09a171916b2722509f",
 };
-
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualFirebaseConfig;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
+// Funciones de Ref estrictas
 const getCollectionRef = (user, colName) => {
-  if (typeof __app_id !== 'undefined') {
-    if (!user) return null;
-    return collection(db, 'artifacts', __app_id, 'users', user.uid, colName);
-  }
-  return collection(db, colName); 
+  if (!user) return null;
+  return collection(db, 'artifacts', appId, 'users', user.uid, colName);
 };
 
 const getDocRef = (user, colName, docId) => {
-  if (typeof __app_id !== 'undefined') {
-    if (!user) return null;
-    return doc(db, 'artifacts', __app_id, 'users', user.uid, colName, docId);
-  }
-  return doc(db, colName, docId);
+  if (!user) return null;
+  return doc(db, 'artifacts', appId, 'users', user.uid, colName, docId);
 };
 
 const getConfigRef = (user) => {
-  if (typeof __app_id !== 'undefined') {
-    if (!user) return null;
-    return doc(db, 'artifacts', __app_id, 'users', user.uid, 'config', 'general');
-  }
-  return doc(db, 'config', 'general');
+  if (!user) return null;
+  return doc(db, 'artifacts', appId, 'users', user.uid, 'config', 'general');
 };
 
+// Utilidades de Fecha y Estado
 const getFechaUnMesDespues = (fechaStr) => {
   if (!fechaStr) return '';
   const d = new Date(fechaStr + 'T00:00:00');
@@ -79,17 +72,26 @@ const getEstadoPrestamo = (prestamo) => {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) return 'Vencido'; 
+  if (diffDays === 0) return 'Vence hoy';
   if (diffDays <= 3) return 'Por vencer'; 
   return 'Al día'; 
 };
 
 const UserContext = createContext(null);
+const AlertContext = createContext(null);
 
 export default function App() {
   const [currentView, setCurrentView] = useState('inicio');
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Sistema de Notificaciones (Toasts) en lugar de alert()
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+  const showAlert = (message, type = 'info') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 3500);
+  };
 
   useEffect(() => {
     const initAuth = async () => {
@@ -130,63 +132,75 @@ export default function App() {
 
   return (
     <UserContext.Provider value={user}>
-      <div className="flex h-screen bg-slate-100 font-sans text-slate-800 flex-col md:flex-row overflow-hidden">
-        
-        {/* Cabecera Móvil */}
-        <div className="md:hidden bg-[#316cb6] text-white p-4 flex items-center justify-between shadow-md z-20">
-          <div className="font-bold flex items-center gap-2">
-            <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center text-[#316cb6]">
-              <Activity size={14} strokeWidth={3} />
+      <AlertContext.Provider value={showAlert}>
+        <div className="flex h-screen bg-slate-100 font-sans text-slate-800 flex-col md:flex-row overflow-hidden">
+          
+          {/* Toast Notification */}
+          {toast.show && (
+            <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-5 fade-in duration-300">
+              <div className={`flex items-center gap-2 px-4 py-3 rounded-lg shadow-xl text-sm font-bold text-white ${toast.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'}`}>
+                {toast.type === 'error' ? <X size={18} /> : <Check size={18} />}
+                {toast.message}
+              </div>
             </div>
-            A&J Soluciones
-          </div>
-          <button onClick={() => setIsMobileMenuOpen(true)} className="p-1 hover:bg-[#295c9e] rounded transition-colors">
-            <Menu size={24} />
-          </button>
-        </div>
+          )}
 
-        {isMobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 bg-slate-900/50 z-40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-        )}
-
-        {/* Sidebar */}
-        <aside className={`fixed md:static inset-y-0 left-0 w-[240px] md:w-[220px] bg-[#316cb6] text-white flex flex-col shadow-2xl md:shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-          <div className="p-4 flex items-center gap-3 border-b border-[#407ac2]">
-            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-[#316cb6] flex-shrink-0 shadow-sm">
-               <Activity size={18} strokeWidth={3} />
+          {/* Cabecera Móvil */}
+          <div className="md:hidden bg-[#316cb6] text-white p-4 flex items-center justify-between shadow-md z-20">
+            <div className="font-bold flex items-center gap-2">
+              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center text-[#316cb6]">
+                <Activity size={14} strokeWidth={3} />
+              </div>
+              A&J Soluciones
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-[15px] tracking-wide leading-tight">A&J Soluciones</span>
-              <span className="text-[10px] text-blue-200 uppercase tracking-wider font-medium">Panel de Control</span>
-            </div>
-            <button className="md:hidden ml-auto text-blue-200 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
-              <X size={20} />
+            <button onClick={() => setIsMobileMenuOpen(true)} className="p-1 hover:bg-[#295c9e] rounded transition-colors">
+              <Menu size={24} />
             </button>
           </div>
-          
-          <nav className="flex-1 py-4 overflow-y-auto">
-            <SidebarItem icon={<Home size={18} />} label="Inicio" isActive={currentView === 'inicio'} onClick={() => navigateTo('inicio')} />
-            <SidebarItem icon={<Users size={18} />} label="Clientes" isActive={currentView === 'clientes'} onClick={() => navigateTo('clientes')} />
-            <SidebarItem icon={<Mail size={18} />} label="Préstamos" isActive={currentView === 'prestamos'} onClick={() => navigateTo('prestamos')} />
-            <SidebarItem icon={<CreditCard size={18} />} label="Pagos" isActive={currentView === 'pagos'} onClick={() => navigateTo('pagos')} />
-            <SidebarItem icon={<Briefcase size={18} />} label="Inversionistas" isActive={currentView === 'inversionistas'} onClick={() => navigateTo('inversionistas')} />
-            <SidebarItem icon={<Lock size={18} />} label="Reportes" isActive={currentView === 'reportes'} onClick={() => navigateTo('reportes')} />
-            <SidebarItem icon={<Calculator size={18} />} label="SUNAT" isActive={currentView === 'sunat'} onClick={() => navigateTo('sunat')} />
-          </nav>
-        </aside>
 
-        <main className="flex-1 overflow-auto relative">
-          <div className="p-4 sm:p-6 md:p-8 max-w-full lg:max-w-5xl mx-auto pb-20">
-            {currentView === 'inicio' && <DashboardPrincipal />}
-            {currentView === 'clientes' && <ListadoClientes />}
-            {currentView === 'prestamos' && <ListadoPrestamos />}
-            {currentView === 'inversionistas' && <ListadoInversionistas />}
-            {currentView === 'pagos' && <Pagos />}
-            {currentView === 'reportes' && <Reportes />}
-            {currentView === 'sunat' && <ReporteSunat />}
-          </div>
-        </main>
-      </div>
+          {isMobileMenuOpen && (
+            <div className="md:hidden fixed inset-0 bg-slate-900/50 z-40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+          )}
+
+          {/* Sidebar */}
+          <aside className={`fixed md:static inset-y-0 left-0 w-[240px] md:w-[220px] bg-[#316cb6] text-white flex flex-col shadow-2xl md:shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+            <div className="p-4 flex items-center gap-3 border-b border-[#407ac2]">
+              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-[#316cb6] flex-shrink-0 shadow-sm">
+                 <Activity size={18} strokeWidth={3} />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-[15px] tracking-wide leading-tight">A&J Soluciones</span>
+                <span className="text-[10px] text-blue-200 uppercase tracking-wider font-medium">Panel de Control</span>
+              </div>
+              <button className="md:hidden ml-auto text-blue-200 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <nav className="flex-1 py-4 overflow-y-auto">
+              <SidebarItem icon={<Home size={18} />} label="Inicio" isActive={currentView === 'inicio'} onClick={() => navigateTo('inicio')} />
+              <SidebarItem icon={<Users size={18} />} label="Clientes" isActive={currentView === 'clientes'} onClick={() => navigateTo('clientes')} />
+              <SidebarItem icon={<Mail size={18} />} label="Préstamos" isActive={currentView === 'prestamos'} onClick={() => navigateTo('prestamos')} />
+              <SidebarItem icon={<CreditCard size={18} />} label="Pagos" isActive={currentView === 'pagos'} onClick={() => navigateTo('pagos')} />
+              <SidebarItem icon={<Briefcase size={18} />} label="Inversionistas" isActive={currentView === 'inversionistas'} onClick={() => navigateTo('inversionistas')} />
+              <SidebarItem icon={<Lock size={18} />} label="Reportes" isActive={currentView === 'reportes'} onClick={() => navigateTo('reportes')} />
+              <SidebarItem icon={<Calculator size={18} />} label="SUNAT" isActive={currentView === 'sunat'} onClick={() => navigateTo('sunat')} />
+            </nav>
+          </aside>
+
+          <main className="flex-1 overflow-auto relative">
+            <div className="p-4 sm:p-6 md:p-8 max-w-full lg:max-w-5xl mx-auto pb-20">
+              {currentView === 'inicio' && <DashboardPrincipal />}
+              {currentView === 'clientes' && <ListadoClientes />}
+              {currentView === 'prestamos' && <ListadoPrestamos />}
+              {currentView === 'inversionistas' && <ListadoInversionistas />}
+              {currentView === 'pagos' && <Pagos />}
+              {currentView === 'reportes' && <Reportes />}
+              {currentView === 'sunat' && <ReporteSunat />}
+            </div>
+          </main>
+        </div>
+      </AlertContext.Provider>
     </UserContext.Provider>
   );
 }
@@ -259,7 +273,6 @@ function DashboardPrincipal() {
     return () => { unsubConfig(); unsubInv(); unsubPres(); unsubClientes(); unsubPagos(); };
   }, [user]);
 
-  // Efecto para calcular el interés Por Cobrar en el mes en curso dinámicamente
   useEffect(() => {
     const hoy = new Date();
     const currentMonthStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
@@ -400,6 +413,7 @@ function DashboardPrincipal() {
 
 function ListadoClientes() {
   const user = useContext(UserContext);
+  const showAlert = useContext(AlertContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -420,16 +434,21 @@ function ListadoClientes() {
   }, [user]);
 
   const handleGuardarCliente = async () => {
-    if (!form.nombre || !form.telefono) return alert('Nombre y teléfono son obligatorios');
+    if (!form.nombre || !form.telefono) return showAlert('Nombre y teléfono son obligatorios', 'error');
     setIsSaving(true);
     try {
       if (editingClientId) {
         await updateDoc(getDocRef(user, 'clientes', editingClientId), { ...form });
+        showAlert('Cliente actualizado correctamente', 'success');
       } else {
         await addDoc(getCollectionRef(user, 'clientes'), { ...form, createdAt: serverTimestamp() });
+        showAlert('Cliente registrado correctamente', 'success');
       }
       closeModal();
-    } catch (error) { console.error(error); } 
+    } catch (error) { 
+      console.error(error); 
+      showAlert('Error al guardar', 'error');
+    } 
     finally { setIsSaving(false); }
   };
 
@@ -545,7 +564,6 @@ function ListadoClientes() {
               <button onClick={() => setIsViewModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
             </div>
             <div className="p-6 overflow-y-auto bg-slate-50/50">
-               {/* Client View Panel */}
                <div className="mb-5 flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm gap-4">
                  <div>
                    <p className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Préstamos Activos</p>
@@ -603,6 +621,7 @@ function ListadoClientes() {
 
 function ListadoPrestamos() {
   const user = useContext(UserContext);
+  const showAlert = useContext(AlertContext);
   const [clientsDb, setClientsDb] = useState([]);
   const [investorsDb, setInvestorsDb] = useState([]);
   const [prestamosDb, setPrestamosDb] = useState([]);
@@ -677,7 +696,7 @@ function ListadoPrestamos() {
   const handleBankVoucherUpload = (bank, e) => { 
     const file = e.target.files[0]; 
     if (!file) return;
-    if (file.size > 800000) return alert('El archivo es demasiado grande (máx 800KB).'); 
+    if (file.size > 800000) return showAlert('El archivo es demasiado grande (máx 800KB).', 'error'); 
     const reader = new FileReader();
     reader.onloadend = () => { setBankVouchers(prev => ({ ...prev, [bank]: { name: file.name, data: reader.result } })); };
     reader.readAsDataURL(file);
@@ -686,7 +705,7 @@ function ListadoPrestamos() {
   const handleDocumentUpload = (e) => { 
     const file = e.target.files[0]; 
     if (!file) return;
-    if (file.size > 800000) return alert('El archivo es demasiado grande (máx 800KB).'); 
+    if (file.size > 800000) return showAlert('El archivo es demasiado grande (máx 800KB).', 'error'); 
     const reader = new FileReader();
     reader.onloadend = () => { setDocumentFile({ name: file.name, data: reader.result }); };
     reader.readAsDataURL(file);
@@ -722,7 +741,7 @@ function ListadoPrestamos() {
   };
 
   const handleGuardarPrestamo = async () => {
-    if (!form.clienteId || !form.monto || !form.fecha) return alert("Seleccione cliente, fecha y monto");
+    if (!form.clienteId || !form.monto || !form.fecha) return showAlert("Seleccione cliente, fecha y monto", 'error');
     setIsSaving(true);
     try {
       const clienteData = clientsDb.find(c => c.id === form.clienteId);
@@ -734,11 +753,16 @@ function ListadoPrestamos() {
       };
       if (editingLoanId) {
         await updateDoc(getDocRef(user, 'prestamos', editingLoanId), payload);
+        showAlert('Préstamo actualizado exitosamente', 'success');
       } else {
         await addDoc(getCollectionRef(user, 'prestamos'), { ...payload, saldo: form.monto, createdAt: serverTimestamp() });
+        showAlert('Préstamo creado exitosamente', 'success');
       }
       closeModal();
-    } catch (error) { console.error(error); } finally { setIsSaving(false); }
+    } catch (error) { 
+      console.error(error);
+      showAlert('Error al guardar el préstamo', 'error');
+    } finally { setIsSaving(false); }
   };
 
   const filteredPrestamos = prestamosDb.filter(p => (p.clienteNombre || '').toLowerCase().includes(searchTerm.toLowerCase())).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
@@ -1208,7 +1232,7 @@ function ListadoPrestamos() {
               )}
             </div>
             <div className="p-5 border-t flex justify-end bg-slate-50 flex-shrink-0">
-              <button onClick={() => setIsViewLoanModalOpen(false)} className="px-8 py-2.5 text-sm font-bold text-white bg-[#3173c6] rounded-lg shadow-sm">Cerrar Detalles</button>
+              <button onClick={() => setIsViewLoanModalOpen(false)} className="px-8 py-2.5 text-sm font-bold text-white bg-[#3173c6] rounded-lg shadow-sm hover:bg-[#2860a8] transition-colors">Cerrar Detalles</button>
             </div>
           </div>
         </div>
@@ -1244,6 +1268,7 @@ function ListadoPrestamos() {
 
 function ListadoInversionistas() {
   const user = useContext(UserContext);
+  const showAlert = useContext(AlertContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedInvestor, setSelectedInvestor] = useState(null);
@@ -1278,29 +1303,34 @@ function ListadoInversionistas() {
   const openPreview = (name, data) => setPreviewModal({ isOpen: true, name, data });
 
   const handleGuardarInv = async () => {
-    if (!form.nombre) return alert('El nombre es obligatorio');
+    if (!form.nombre) return showAlert('El nombre es obligatorio', 'error');
     setIsSaving(true);
     try {
       if (editingInvestorId) {
         await updateDoc(getDocRef(user, 'inversionistas', editingInvestorId), { ...form });
+        showAlert('Inversionista actualizado correctamente', 'success');
       } else {
         await addDoc(getCollectionRef(user, 'inversionistas'), { ...form, createdAt: serverTimestamp() });
+        showAlert('Inversionista registrado correctamente', 'success');
       }
       closeModal();
-    } catch(e) { console.error(e); } finally { setIsSaving(false); }
+    } catch(e) { 
+      console.error(e);
+      showAlert('Error al guardar inversionista', 'error');
+    } finally { setIsSaving(false); }
   };
 
   const handlePagoDocumentoUpload = (e) => { 
     const file = e.target.files[0]; 
     if (!file) return;
-    if (file.size > 800000) return alert('El archivo es demasiado grande (máx 800KB).'); 
+    if (file.size > 800000) return showAlert('El archivo es demasiado grande (máx 800KB).', 'error'); 
     const reader = new FileReader();
     reader.onloadend = () => setPagoDocumentoFile({ name: file.name, data: reader.result });
     reader.readAsDataURL(file);
   };
 
   const handleRegistrarPagoInv = async () => {
-    if(!pagoForm.inversionistaId || !pagoForm.monto || !pagoForm.fecha) return alert("Seleccione un inversionista, fecha y monto.");
+    if(!pagoForm.inversionistaId || !pagoForm.monto || !pagoForm.fecha) return showAlert("Seleccione un inversionista, fecha y monto.", "error");
     setIsSaving(true);
     try {
       const inv = investors.find(i => i.id === pagoForm.inversionistaId);
@@ -1311,18 +1341,25 @@ function ListadoInversionistas() {
         const nuevoMonto = Math.max(0, parseFloat(inv.monto || 0) - parseFloat(pagoForm.monto));
         await updateDoc(getDocRef(user, 'inversionistas', inv.id), { monto: nuevoMonto.toString() });
       }
-      alert("Pago registrado correctamente");
+      showAlert("Pago registrado correctamente", "success");
       closePagoModal();
-    } catch(e) { console.error(e); } finally { setIsSaving(false); }
+    } catch(e) { 
+      console.error(e);
+      showAlert("Error al registrar pago", "error");
+    } finally { setIsSaving(false); }
   };
 
   const handleGuardarEditPagoInv = async () => {
-    if(!editPagoForm.monto) return alert("El monto es obligatorio");
+    if(!editPagoForm.monto) return showAlert("El monto es obligatorio", "error");
     setIsSaving(true);
     try {
       await updateDoc(getDocRef(user, 'pagos_inversionistas', editPagoForm.id), { fecha: editPagoForm.fecha, monto: editPagoForm.monto, concepto: editPagoForm.concepto });
       setIsEditPagoModalOpen(false);
-    } catch (e) { console.error("Error al actualizar pago:", e); } finally { setIsSaving(false); }
+      showAlert("Pago actualizado", "success");
+    } catch (e) { 
+      console.error("Error al actualizar pago:", e); 
+      showAlert("Error al actualizar pago", "error");
+    } finally { setIsSaving(false); }
   };
 
   const closeModal = () => { setIsModalOpen(false); setEditingInvestorId(null); setForm({ nombre: '', dni: '', telefono: '', fecha: '', direccion: '', monto: '', tasa: '', banco: '' }); };
@@ -1552,6 +1589,7 @@ function ListadoInversionistas() {
 
 function Pagos() {
   const user = useContext(UserContext);
+  const showAlert = useContext(AlertContext);
   const [clienteSearch, setClienteSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedPrestamo, setSelectedPrestamo] = useState(null);
@@ -1605,7 +1643,7 @@ function Pagos() {
   }).sort((a,b) => new Date(b.fechaPago) - new Date(a.fechaPago));
 
   const handleRegistrarPago = async () => {
-    if(!selectedPrestamo || !form.montoPagado || !form.fechaPago) return alert("Complete los datos básicos del pago.");
+    if(!selectedPrestamo || !form.montoPagado || !form.fechaPago) return showAlert("Complete los datos básicos del pago.", "error");
     setIsSaving(true);
     try {
       const saldoActual = parseFloat(selectedPrestamo.saldo !== undefined ? selectedPrestamo.saldo : selectedPrestamo.monto);
@@ -1646,9 +1684,12 @@ function Pagos() {
       });
       await updateDoc(getDocRef(user, 'prestamos', selectedPrestamo.id), { saldo: nuevoSaldo.toFixed(2), proximaFechaPago: nuevaProxima });
 
-      alert("Pago registrado con éxito");
+      showAlert("Pago registrado con éxito", "success");
       setForm({ fechaPago: '', montoPagado: '', banco: 'Efectivo', concepto: 'Interés', comentario: '' }); setClienteSearch(''); setSelectedPrestamo(null); setPagoVoucher(null);
-    } catch(e) { console.error(e); } finally { setIsSaving(false); }
+    } catch(e) { 
+      console.error(e);
+      showAlert("Error al registrar pago", "error");
+    } finally { setIsSaving(false); }
   };
 
   const openEditPago = (pago) => {
@@ -1666,15 +1707,69 @@ function Pagos() {
   };
 
   const handleGuardarEditPago = async () => {
-    if(!editPagoForm.montoPagado) return alert("El monto es obligatorio");
+    if(!editPagoForm.montoPagado) return showAlert("El monto es obligatorio", "error");
     setIsSaving(true);
     try {
-      await updateDoc(getDocRef(user, 'pagos', editPagoForm.id), {
-        fechaPago: editPagoForm.fechaPago, montoPagado: editPagoForm.montoPagado,
-        banco: editPagoForm.banco, concepto: editPagoForm.concepto, comentario: editPagoForm.comentario
-      });
+      const originalPago = pagosDb.find(p => p.id === editPagoForm.id);
+      const prestamo = prestamosDb.find(p => p.id === originalPago?.prestamoId);
+      
+      let updatesPago = {
+        fechaPago: editPagoForm.fechaPago,
+        montoPagado: editPagoForm.montoPagado,
+        banco: editPagoForm.banco,
+        concepto: editPagoForm.concepto,
+        comentario: editPagoForm.comentario
+      };
+
+      if (prestamo && originalPago) {
+         let oldAmort = 0;
+         if (originalPago.concepto === 'Amortización') oldAmort = parseFloat(originalPago.montoPagado || 0);
+         else if (originalPago.concepto === 'Ambos (Interés + Amortización)') {
+           oldAmort = parseFloat(originalPago.montoPagado || 0) - parseFloat(originalPago.interesCobrado || 0);
+         }
+         const saldoSinOriginal = parseFloat(prestamo.saldo !== undefined ? prestamo.saldo : prestamo.monto) + oldAmort;
+
+         const newMonto = parseFloat(editPagoForm.montoPagado || 0);
+         const tasa = parseFloat(prestamo.tasa || 0);
+         const interesGenerado = saldoSinOriginal * (tasa / 100);
+
+         let newInteresCobrado = 0;
+         let newAmort = 0;
+
+         if (editPagoForm.concepto === 'Interés') newInteresCobrado = newMonto;
+         else if (editPagoForm.concepto === 'Amortización') newAmort = newMonto;
+         else if (editPagoForm.concepto === 'Ambos (Interés + Amortización)') {
+           newInteresCobrado = Math.min(interesGenerado, newMonto);
+           newAmort = newMonto - newInteresCobrado;
+         }
+
+         let nuevoSaldoFinal = Math.max(0, saldoSinOriginal - newAmort);
+
+         let newIntInv = 0;
+         if (newInteresCobrado > 0 && prestamo.financingSources?.includes('inversionista')) {
+            let intInvTeorico = 0;
+            prestamo.selectedInvestors?.forEach(invId => {
+               const inv = investorsDb.find(i => i.id === invId);
+               intInvTeorico += (parseFloat(prestamo.investorAmounts?.[invId] || 0) * (parseFloat(inv?.tasa || 0) / 100));
+            });
+            let prop = interesGenerado > 0 ? Math.min(1, newInteresCobrado / interesGenerado) : 1;
+            newIntInv = intInvTeorico * prop;
+         }
+
+         updatesPago.interesCobrado = newInteresCobrado.toFixed(2);
+         updatesPago.interesInversionistas = newIntInv.toFixed(2);
+
+         await updateDoc(getDocRef(user, 'prestamos', prestamo.id), { saldo: nuevoSaldoFinal.toFixed(2) });
+      }
+
+      await updateDoc(getDocRef(user, 'pagos', editPagoForm.id), updatesPago);
+      
       setIsEditPagoModalOpen(false);
-    } catch (e) { console.error("Error al actualizar pago:", e); } finally { setIsSaving(false); }
+      showAlert("Recibo y saldo actualizados", "success");
+    } catch (e) { 
+      console.error("Error al actualizar pago:", e);
+      showAlert("Error al actualizar", "error");
+    } finally { setIsSaving(false); }
   };
 
   return (
@@ -1955,8 +2050,8 @@ function Pagos() {
                  <label className="text-sm font-medium text-slate-700">Comentarios:</label>
                  <textarea rows="2" value={editPagoForm.comentario || ''} onChange={(e) => setEditPagoForm({...editPagoForm, comentario: e.target.value})} className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:border-[#3173c6] resize-none bg-white"></textarea>
                </div>
-               <p className="text-xs text-rose-500 bg-rose-50 p-2 rounded border border-rose-100 mt-2">
-                 <b>Nota:</b> Modificar un pago antiguo desde aquí no recalculará el saldo de la deuda automáticamente. Hazlo con cuidado.
+               <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200 mt-2">
+                 <b>Nota:</b> Modificar el monto o concepto recalculará automáticamente el saldo actual del préstamo.
                </p>
             </div>
             <div className="p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-slate-50">
@@ -2096,6 +2191,7 @@ function Reportes() {
   const [prestamos, setPrestamos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
+  const [sortOrder, setSortOrder] = useState('asc');
   const reporteRef = useRef(null);
   
   const [visibleColumns, setVisibleColumns] = useState({
@@ -2114,7 +2210,21 @@ function Reportes() {
   };
 
   const prestamosConEstado = prestamos.map(p => ({ ...p, estadoCalculado: getEstadoPrestamo(p) }));
-  const filteredPrestamos = prestamosConEstado.filter(p => p.clienteNombre?.toLowerCase().includes(searchTerm.toLowerCase()) && (filterStatus === 'Todos' || p.estadoCalculado === filterStatus));
+  const filteredPrestamos = prestamosConEstado.filter(p => {
+    const matchSearch = p.clienteNombre?.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchSearch) return false;
+    if (filterStatus === 'Todos') return p.estadoCalculado !== 'Pagado';
+    if (filterStatus === 'TodosPagados') return true;
+    if (filterStatus === 'VencidosYPorVencer') return p.estadoCalculado === 'Vencido' || p.estadoCalculado === 'Por vencer';
+    if (filterStatus === 'VencidosYVenceHoy') return p.estadoCalculado === 'Vencido' || p.estadoCalculado === 'Vence hoy';
+    return p.estadoCalculado === filterStatus;
+  });
+
+  if (sortOrder === 'asc') {
+     filteredPrestamos.sort((a, b) => (a.clienteNombre || '').localeCompare(b.clienteNombre || ''));
+  } else if (sortOrder === 'desc') {
+     filteredPrestamos.sort((a, b) => (b.clienteNombre || '').localeCompare(a.clienteNombre || ''));
+  }
 
   const toggleColumn = (col) => setVisibleColumns(prev => ({ ...prev, [col]: !prev[col] }));
 
@@ -2160,7 +2270,23 @@ function Reportes() {
           </div>
           <div className="relative w-full md:w-56">
              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full pl-4 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm appearance-none bg-slate-50 focus:bg-white text-slate-700 font-bold focus:outline-none focus:border-[#3173c6] transition-all">
-               <option value="Todos">Todos los Estados</option><option value="Al día">Solo Al día</option><option value="Por vencer">Solo Por vencer</option><option value="Vencido">Solo Vencidos</option><option value="Congelado">Solo Congelados</option><option value="Pagado">Solo Pagados</option>
+               <option value="Todos">Todos (Activos)</option>
+               <option value="TodosPagados">Todos (Incluye Pagados)</option>
+               <option value="Al día">Solo Al día</option>
+               <option value="Por vencer">Solo Por vencer</option>
+               <option value="Vence hoy">Solo Vence hoy</option>
+               <option value="Vencido">Solo Vencidos</option>
+               <option value="VencidosYPorVencer">Vencidos + Por vencer</option>
+               <option value="VencidosYVenceHoy">Vencidos + Vence hoy</option>
+               <option value="Congelado">Solo Congelados</option>
+             </select>
+             <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+          </div>
+          <div className="relative w-full md:w-56">
+             <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="w-full pl-4 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm appearance-none bg-slate-50 focus:bg-white text-slate-700 font-bold focus:outline-none focus:border-[#3173c6] transition-all">
+               <option value="asc">Orden: Cliente (A - Z)</option>
+               <option value="desc">Orden: Cliente (Z - A)</option>
+               <option value="none">Orden: Por defecto</option>
              </select>
              <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
           </div>
