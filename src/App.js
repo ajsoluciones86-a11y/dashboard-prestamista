@@ -11,33 +11,44 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+const manualFirebaseConfig = {
   apiKey: "AIzaSyCz4997ZuPpvyaFee37fFeUn9SUE8QG7hQ",
   authDomain: "sistema-prestamos-43b76.firebaseapp.com",
   projectId: "sistema-prestamos-43b76",
   storageBucket: "sistema-prestamos-43b76.firebasestorage.app",
   messagingSenderId: "530325274830",
-  appId: "1:530325274830:web:b94b09a171916b2722509f",
+  appId: "1:530325274830:web:b94b09a171916b2722509f"
 };
+
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualFirebaseConfig;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// Funciones de Ref estrictas
+// Funciones de Ref flexibles (Compatible con este entorno y tu servidor local)
 const getCollectionRef = (user, colName) => {
-  if (!user) return null;
-  return collection(db, 'artifacts', appId, 'users', user.uid, colName);
+  if (typeof __app_id !== 'undefined') {
+    if (!user) return null;
+    return collection(db, 'artifacts', appId, 'users', user.uid, colName);
+  }
+  return collection(db, colName); 
 };
 
 const getDocRef = (user, colName, docId) => {
-  if (!user) return null;
-  return doc(db, 'artifacts', appId, 'users', user.uid, colName, docId);
+  if (typeof __app_id !== 'undefined') {
+    if (!user) return null;
+    return doc(db, 'artifacts', appId, 'users', user.uid, colName, docId);
+  }
+  return doc(db, colName, docId);
 };
 
 const getConfigRef = (user) => {
-  if (!user) return null;
-  return doc(db, 'artifacts', appId, 'users', user.uid, 'config', 'general');
+  if (typeof __app_id !== 'undefined') {
+    if (!user) return null;
+    return doc(db, 'artifacts', appId, 'users', user.uid, 'config', 'general');
+  }
+  return doc(db, 'config', 'general');
 };
 
 // Utilidades de Fecha y Estado
