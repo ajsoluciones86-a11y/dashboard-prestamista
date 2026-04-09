@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, createContext, useContext } from 'r
 import { 
   Home, Users, Mail, Briefcase, Lock, Settings, Bell, Search, 
   ChevronDown, RefreshCcw, Clock, PieChart, DollarSign, TrendingUp, 
-  BarChart2, Activity, X, Download, Check, Upload, FileText, CreditCard, Edit2, Eye, Cloud, Calculator, Menu
+  BarChart2, Activity, X, Download, Check, Upload, FileText, CreditCard, Edit2, Eye, Cloud, Calculator, Menu, Camera
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -1982,8 +1982,8 @@ function Pagos() {
                       <td className="py-3.5 px-4 sm:px-6 text-emerald-700 font-black">S/ {pago.montoPagado}</td>
                       <td className="py-3.5 px-4 sm:px-6 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button onClick={() => openEditPago(pago)} className="bg-white border border-slate-300 text-slate-600 text-xs px-3 py-1.5 rounded hover:bg-slate-100 transition-colors">
-                            Editar
+                          <button onClick={() => openEditPago(pago)} className="bg-amber-50 border border-amber-200 text-amber-600 text-xs px-3 py-1.5 rounded hover:bg-amber-100 transition-colors flex items-center gap-1 font-semibold">
+                            <Edit2 size={12} /> Editar
                           </button>
                           <button onClick={() => { setSelectedPagoModal(pago); setIsViewPagoModalOpen(true); }} className="bg-slate-800 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-700 shadow-sm transition-colors">
                             Detalles
@@ -2162,7 +2162,10 @@ function Pagos() {
                 )}
               </div>
             </div>
-            <div className="p-5 border-t border-slate-200 flex justify-end bg-slate-50">
+            <div className="p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-between gap-3 bg-slate-50 items-center">
+              <button onClick={() => { setIsViewPagoModalOpen(false); openEditPago(selectedPagoModal); }} className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                <Edit2 size={16} /> Editar este pago
+              </button>
               <button onClick={() => setIsViewPagoModalOpen(false)} className="w-full sm:w-auto px-8 py-2.5 text-sm font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-sm transition-colors">Cerrar Recibo</button>
             </div>
           </div>
@@ -2203,6 +2206,7 @@ function Reportes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [sortOrder, setSortOrder] = useState('asc');
+  const [isScreenshotting, setIsScreenshotting] = useState(false);
   const reporteRef = useRef(null);
   
   const [visibleColumns, setVisibleColumns] = useState({
@@ -2266,11 +2270,41 @@ function Reportes() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
+  const handleScreenshot = async () => {
+    setIsScreenshotting(true);
+    try {
+      if (!window.html2canvas) {
+        const script = document.createElement('script');
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+        document.body.appendChild(script);
+        await new Promise(resolve => script.onload = resolve);
+      }
+      if (reporteRef.current) {
+        const canvas = await window.html2canvas(reporteRef.current, { scale: 2, useCORS: true });
+        const link = document.createElement('a');
+        link.download = `reporte_prestamos_${new Date().toISOString().split('T')[0]}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+    } catch (error) {
+      console.error("Error al tomar captura:", error);
+    } finally {
+      setIsScreenshotting(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
          <h1 className="text-xl sm:text-2xl font-bold text-slate-700">Reporte de Préstamos Activos</h1>
-         <button onClick={handleExportExcel} className="bg-emerald-600 text-white text-sm px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm font-bold hover:bg-emerald-700 transition-colors w-full sm:w-auto"><Download size={16}/> Exportar a Excel</button>
+         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+           <button onClick={handleScreenshot} disabled={isScreenshotting} className="bg-[#3173c6] text-white text-sm px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm font-bold hover:bg-[#2860a8] transition-colors disabled:opacity-50">
+             {isScreenshotting ? <RefreshCcw size={16} className="animate-spin" /> : <Camera size={16}/>} Capturar Imagen
+           </button>
+           <button onClick={handleExportExcel} className="bg-emerald-600 text-white text-sm px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm font-bold hover:bg-emerald-700 transition-colors">
+             <Download size={16}/> Exportar a Excel
+           </button>
+         </div>
       </div>
 
       <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col gap-5">
